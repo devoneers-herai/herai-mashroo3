@@ -21,7 +21,7 @@ The Phase 1 product is considered Done when:
 - At least 2–3 real Council rules exist in the database.
 - Each Council rule contains a `created_by` value.
 - Every ADJUST or BLOCK decision is captured in the escalation log.
-- Every chat exchange is logged to MongoDB.
+- Every chat exchange is logged to Supabase.
 - QA has completed the quality gate checklist.
 - The lead-capture form works end-to-end.
 - A Phase 2 Kickoff note exists describing the deferred items and their order.
