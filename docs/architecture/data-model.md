@@ -31,11 +31,10 @@ erDiagram
 
     RULES ||--o{ VERDICTS : affects
 
-    COUNCIL_DECISIONS ||--o{ RULES : creates
-
     CONVERSATIONS {
         uuid id PK
         string region_code
+        string region_config_version
         string domain_scope
         text scrubbed_message
         datetime created_at
@@ -44,7 +43,7 @@ erDiagram
     VERDICTS {
         uuid id PK
         uuid conversation_id FK
-        string verdict
+        string action
         float bias_score
         float risk_score
         array matched_rule_ids
@@ -60,6 +59,7 @@ erDiagram
         string domain_scope
         string rule_type
         text rule_text
+        vector embedding
         boolean active
         datetime created_at
     }
@@ -68,12 +68,12 @@ erDiagram
         uuid id PK
         string decision_type
         text decision_content
+        string created_by
+        datetime timestamp
+        text rationale
         string version
-        datetime created_at
     }
 ```
-
----
 
 # 4. Conversations
 
