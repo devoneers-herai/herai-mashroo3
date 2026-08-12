@@ -1,0 +1,8 @@
+{
+  "region_code": "EG",
+  "version": "v1",
+  "active_safety_ruleset_id": "ruleset-eg-v1",
+  "active_council_content_version": "council-eg-v1",
+  "channel_fallback_order": ["whatsapp", "sms", "voice"],
+  "domain_scope": ["agri"]
+}
