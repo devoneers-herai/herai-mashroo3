@@ -23,6 +23,16 @@ create table public.users (
   updated_at timestamptz not null default now()
 );
 
+create type public.council_member_status as enum ('pending', 'approved', 'rejected');
+
+create table public.council_members (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null unique references auth.users(id),
+  status public.council_member_status not null default 'pending',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table public.rules (
   rule_id text primary key,
   version integer not null default 1,
@@ -35,21 +45,19 @@ create table public.rules (
   trigger_description text not null,
   adjustment_instruction text not null,
   fallback_message text not null,
-  created_by text not null,
+  created_by uuid not null references public.council_members(user_id),
   embedding vector(1536),
   created_at timestamptz not null default now()
 );
 
 create table public.conversations (
   id uuid primary key default gen_random_uuid(),
-  region text,
+  user_id uuid not null references public.users(id),
   region_code text,
   region_config_version text,
-  domain text,
   domain_scope text,
   persona text,
-  message text not null,
-  scrubbed_message text,
+  scrubbed_message text not null,
   draft text,
   created_at timestamptz not null default now()
 );
@@ -71,7 +79,7 @@ create table public.council_decisions (
   id uuid primary key default gen_random_uuid(),
   decision_type text not null,
   decision_content text not null,
-  created_by text not null,
+  created_by uuid not null references public.council_members(user_id),
   "timestamp" timestamptz not null default now(),
   rationale text not null,
   version text not null

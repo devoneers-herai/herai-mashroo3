@@ -3,6 +3,7 @@ type DraftInput = {
   region?: string
   persona?: string
   domain?: string
+  adjustmentInstruction?: string
 }
 
 // Domain-specific system prompts
@@ -82,8 +83,9 @@ function getSystemPrompt(input: DraftInput): string {
   // Add region and persona context to domain-specific prompt
   const regionContext = input.region ? `\nRegion: ${input.region}` : ''
   const personaContext = input.persona ? ` (Persona: ${input.persona})` : ''
+  const adjustmentContext = input.adjustmentInstruction ? `\nCRITICAL INSTRUCTION: ${input.adjustmentInstruction}` : ''
   
-  return `${domainPrompt}${regionContext}${personaContext}`
+  return `${domainPrompt}${regionContext}${personaContext}${adjustmentContext}`
 }
 
 export async function generateDraft(input: DraftInput, openaiApiKey: string): Promise<string> {

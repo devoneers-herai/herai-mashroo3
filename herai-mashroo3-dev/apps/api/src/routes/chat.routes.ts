@@ -1,17 +1,23 @@
 import { Router, Request, Response, NextFunction } from 'express'
-import { generateDraft, evaluateSafety } from '../services/ai.service'
 import { handleChatLogic } from '../services/chat.service'
+import authMiddleware from '../middleware/auth.middleware'
 
-type ServiceRequest = Request & { services?: { supabase?: any; OPENAI_API_KEY?: string } }
+type ServiceRequest = Request & { services?: { supabase?: any; OPENAI_API_KEY?: string }; user?: any }
 
 const router = Router()
 
-router.post('/', async (req: ServiceRequest, res: Response, next: NextFunction) => {
+router.post('/', authMiddleware, async (req: ServiceRequest, res: Response, next: NextFunction) => {
   try {
-    const { message, region, persona, domain } = req.body
+    const { message, region_code, domain_scope, persona } = req.body
     const { supabase, OPENAI_API_KEY } = req.services || {}
+    const user_id = req.user?.id
 
-    const output = await handleChatLogic({ message, region, persona, domain }, {
+    if (!user_id) {
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
+
+    const output = await handleChatLogic({ message, region_code, domain_scope, persona, user_id }, {
       supabase,
       openaiKey: OPENAI_API_KEY as string,
     })
