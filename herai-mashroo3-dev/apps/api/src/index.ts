@@ -1,5 +1,6 @@
 import express from 'express'
 import bodyParser from 'body-parser'
+import authRoutes from './routes/auth.routes'
 import chatRoutes from './routes/chat.routes'
 import councilRoutes from './routes/council.routes'
 import getServerConfig from './config/server.config'
@@ -18,6 +19,7 @@ async function main() {
     next()
   })
 
+  app.use('/api/auth', authRoutes)
   app.use('/api/chat', chatRoutes)
   app.use('/api/council', councilRoutes)
 
