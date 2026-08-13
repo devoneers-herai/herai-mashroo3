@@ -16,6 +16,21 @@ create type public.rule_status as enum ('draft', 'active', 'inactive');
 create type public.rule_decision_type as enum ('adjust', 'block');
 create type public.verdict_action as enum ('safe', 'adjust', 'block');
 
+-- Users table: links Supabase Auth user to user profile
+create table public.users (
+  id uuid primary key references auth.users(id),
+  email text not null unique,
+  first_name text,
+  last_name text,
+  age integer,
+  domain text,
+  country text,
+  city text,
+  phone_number text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table public.rules (
   rule_id text primary key,
   version integer not null default 1,

@@ -1,17 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 
-export type CouncilRegisterInput = {
-  email: string
-  password: string
-  firstName: string
-  lastName: string
-}
-
-export type CouncilApprovalInput = {
-  user_id: string
-  action: 'approve' | 'reject'
-}
-
 export type CouncilMemberResponse = {
   id: string
   user_id: string
@@ -20,74 +8,35 @@ export type CouncilMemberResponse = {
 }
 
 /**
- * Register a new Council member
- * 1. Create Supabase Auth account
- * 2. Create council_members record with pending status
+ * Register a new Council member.
+ * The caller must already be authenticated (user_id comes from authMiddleware).
+ * This simply creates the council_members row with status='pending'.
  */
 export async function registerCouncilMember(
-  input: CouncilRegisterInput,
+  user_id: string,
   supabase: SupabaseClient
 ): Promise<CouncilMemberResponse> {
-  const { email, password, firstName, lastName } = input
-
-  // 1. Create Supabase Auth account
-  const { data: authData, error: signUpError } = await supabase.auth.signUp({
-    email,
-    password,
-  })
-
-  if (signUpError) {
-    throw new Error(`Council signup failed: ${signUpError.message}`)
-  }
-
-  const userId = authData?.user?.id
-  if (!userId) {
-    throw new Error('No user ID returned from signup')
-  }
-
-  // 2. Create user profile in public.users table
-  const { error: profileError } = await supabase.from('users').insert([
-    {
-      id: userId,
-      email,
-      first_name: firstName,
-      last_name: lastName,
-    },
-  ])
-
-  if (profileError) {
-    console.error('Profile creation failed:', profileError)
-    throw new Error(`Profile creation failed: ${profileError.message}`)
-  }
-
-  // 3. Create council_members record with pending status
-  const { data: councilData, error: councilError } = await supabase
+  const { data, error } = await supabase
     .from('council_members')
-    .insert([
-      {
-        user_id: userId,
-        status: 'pending',
-      },
-    ])
+    .insert([{ user_id, status: 'pending' }])
     .select()
     .single()
 
-  if (councilError) {
-    console.error('Council registration failed:', councilError)
-    throw new Error(`Council registration failed: ${councilError.message}`)
+  if (error) {
+    throw new Error(`Council registration failed: ${error.message}`)
   }
 
   return {
-    id: councilData.id,
-    user_id: councilData.user_id,
-    status: councilData.status,
-    created_at: councilData.created_at,
+    id: data.id,
+    user_id: data.user_id,
+    status: data.status,
+    created_at: data.created_at,
   }
 }
 
 /**
- * Get council member status
- * Returns the council membership record and status
+ * Get council member status.
+ * Returns the council membership record and status, or null if not found.
  */
 export async function getCouncilMemberStatus(
   userId: string,
@@ -116,20 +65,22 @@ export async function getCouncilMemberStatus(
 }
 
 /**
- * Approve or reject a council member application
- * Only callable by admin/authorized users
+ * Approve or reject a council member application.
+ * Signature matches council.routes.ts call: (user_id, status, supabase).
  */
 export async function updateCouncilMemberStatus(
-  input: CouncilApprovalInput,
+  user_id: string,
+  status: 'approved' | 'rejected',
   supabase: SupabaseClient
 ): Promise<CouncilMemberResponse> {
-  const { user_id, action } = input
-
-  const status = action === 'approve' ? 'approved' : 'rejected'
+  const updatePayload: Record<string, unknown> = { status }
+  if (status === 'approved') {
+    updatePayload.approved_at = new Date().toISOString()
+  }
 
   const { data, error } = await supabase
     .from('council_members')
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq('user_id', user_id)
     .select()
     .single()
@@ -147,8 +98,8 @@ export async function updateCouncilMemberStatus(
 }
 
 /**
- * Check if a user is an approved council member
- * Returns true only if user exists in council_members with status='approved'
+ * Check if a user is an approved council member.
+ * Returns true only if user exists in council_members with status='approved'.
  */
 export async function isApprovedCouncilMember(
   userId: string,

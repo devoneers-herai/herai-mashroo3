@@ -12,10 +12,10 @@ export type RegionConfig = {
 
 /**
  * Runtime Region Resolution Service
- * 
- * Loads region configuration from static JSON files
- * At runtime, the system determines the Region, then resolves its configuration
- * 
+ *
+ * Loads region configuration from static JSON files.
+ * At runtime, the system determines the Region, then resolves its configuration.
+ *
  * Flow: region_code → load region_config → get active configuration/version → use configuration
  */
 class RegionResolver {
@@ -23,22 +23,20 @@ class RegionResolver {
   private configDir: string
 
   constructor() {
-    // Config directory path
-    this.configDir = path.join(__dirname, '../../..', 'herai_backend_contracts/config')
+    // Config directory path — relative to compiled output location
+    this.configDir = path.join(__dirname, '../../../..', 'herai_backend_contracts/config')
   }
 
   /**
-   * Resolve region configuration by region code
-   * Loads from region_config.{REGION}.json
+   * Resolve region configuration by region code.
+   * Loads from region_config.{REGION}.json, caches result.
    */
   async resolveRegionConfig(regionCode: string): Promise<RegionConfig | null> {
     try {
-      // Check cache first
       if (this.configCache.has(regionCode)) {
         return this.configCache.get(regionCode) || null
       }
 
-      // Load from file
       const configPath = path.join(this.configDir, `region_config.${regionCode}.json`)
 
       if (!fs.existsSync(configPath)) {
@@ -49,9 +47,7 @@ class RegionResolver {
       const configContent = fs.readFileSync(configPath, 'utf-8')
       const config: RegionConfig = JSON.parse(configContent)
 
-      // Cache it
       this.configCache.set(regionCode, config)
-
       return config
     } catch (error) {
       console.error(`Error resolving region config for ${regionCode}:`, error)
@@ -60,34 +56,41 @@ class RegionResolver {
   }
 
   /**
-   * Get region config version
-   * Returns the version string from the active configuration
+   * Synchronous region config lookup (from cache or disk).
+   * Throws if the config is not found — used by chat.service to fail fast.
    */
+  getRegionConfigSync(regionCode: string): RegionConfig {
+    // Check cache first
+    const cached = this.configCache.get(regionCode)
+    if (cached) return cached
+
+    const configPath = path.join(this.configDir, `region_config.${regionCode}.json`)
+
+    if (!fs.existsSync(configPath)) {
+      throw new Error(`Region config not found for region: ${regionCode}`)
+    }
+
+    const configContent = fs.readFileSync(configPath, 'utf-8')
+    const config: RegionConfig = JSON.parse(configContent)
+    this.configCache.set(regionCode, config)
+    return config
+  }
+
   async getRegionConfigVersion(regionCode: string): Promise<string | null> {
     const config = await this.resolveRegionConfig(regionCode)
     return config ? config.version : null
   }
 
-  /**
-   * Get active safety ruleset for a region
-   * This will be used to filter which safety rules apply
-   */
   async getActiveSafetyRulesetId(regionCode: string): Promise<string | null> {
     const config = await this.resolveRegionConfig(regionCode)
     return config ? config.active_safety_ruleset_id : null
   }
 
-  /**
-   * Get domain scopes available in a region
-   */
   async getDomainScopes(regionCode: string): Promise<string[] | null> {
     const config = await this.resolveRegionConfig(regionCode)
     return config ? config.domain_scope : null
   }
 
-  /**
-   * Clear cache (useful for testing or config reloads)
-   */
   clearCache() {
     this.configCache.clear()
   }
@@ -95,5 +98,14 @@ class RegionResolver {
 
 // Export singleton instance
 export const regionResolver = new RegionResolver()
+
+/**
+ * Named export used by chat.service.ts.
+ * Synchronous — loads from disk on first call, then serves from cache.
+ * Throws if region code is unknown.
+ */
+export function getRegionConfig(regionCode: string): RegionConfig {
+  return regionResolver.getRegionConfigSync(regionCode)
+}
 
 export default regionResolver

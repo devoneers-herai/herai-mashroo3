@@ -16,33 +16,55 @@ export async function handleChatLogic(input: ChatInput, deps: { supabase: any; o
   // 2. Scrub PII
   const scrubbed = await scrub(input.message)
 
-  // 3. Generate initial draft
-  let draft = await generateDraft({ message: scrubbed, region: regionCode, persona: input.persona, domain: domainScope }, openaiKey)
+  let finalResponse = ''
+  let verdict: any = null
+  const verdictsToSave: any[] = []
   
-  // 4. Safety evaluation (initial)
-  let verdict = await evaluateSafety(draft, openaiKey)
-  const verdictsToSave = [verdict]
-
-  // 5. ADJUST Re-check Flow
-  if (verdict.action === 'adjust') {
-    // Re-generate draft with adjustment instruction
-    draft = await generateDraft({ 
-      message: scrubbed, 
-      region: regionCode, 
-      persona: input.persona, 
-      domain: domainScope,
-      adjustmentInstruction: 'Ensure the response completely avoids any biased or high-risk language.' 
-    }, openaiKey)
+  // Wrap AI calls in try/catch to ensure errors trigger a BLOCK
+  try {
+    // 3. Generate initial draft
+    let draft = await generateDraft({ message: scrubbed, region: regionCode, persona: input.persona, domain: domainScope }, openaiKey)
     
-    // Evaluate the new draft
+    // 4. Safety evaluation (initial)
     verdict = await evaluateSafety(draft, openaiKey)
+    verdict.draft_response = draft // Save the original draft for this verdict
     verdictsToSave.push(verdict)
-  }
 
-  // 6. Handle BLOCK
-  let finalResponse = draft
-  if (verdict.action === 'block') {
+    // 5. ADJUST Re-check Flow
+    if (verdict.action === 'adjust') {
+      // Re-generate draft with adjustment instruction
+      draft = await generateDraft({ 
+        message: scrubbed, 
+        region: regionCode, 
+        persona: input.persona, 
+        domain: domainScope,
+        adjustmentInstruction: 'Ensure the response completely avoids any biased or high-risk language.' 
+      }, openaiKey)
+      
+      // Evaluate the new draft
+      verdict = await evaluateSafety(draft, openaiKey)
+      verdict.draft_response = draft // Save the adjusted draft for this verdict
+      verdictsToSave.push(verdict)
+    }
+
+    finalResponse = draft
+    
+    // 6. Handle BLOCK
+    if (verdict.action === 'block') {
+      finalResponse = "I cannot provide a response to that request due to safety policies."
+    }
+  } catch (err) {
+    console.error('AI pipeline error:', err)
+    // Fallback block verdict
+    verdict = {
+      action: 'block',
+      bias_score: 1,
+      risk_score: 1,
+      matched_rule_ids: [],
+      draft_response: '',
+    }
     finalResponse = "I cannot provide a response to that request due to safety policies."
+    verdictsToSave.push(verdict)
   }
 
   // 7. Persist to DB
@@ -51,10 +73,8 @@ export async function handleChatLogic(input: ChatInput, deps: { supabase: any; o
       user_id: input.user_id,
       region_code: regionCode,
       region_config_version: configVersion,
-      persona: input.persona || null,
       domain_scope: domainScope || null,
       scrubbed_message: scrubbed,
-      draft: finalResponse,
     }]).select().single()
 
     if (convError) throw convError
@@ -68,7 +88,7 @@ export async function handleChatLogic(input: ChatInput, deps: { supabase: any; o
       risk_score: v.risk_score,
       matched_rule_ids: v.matched_rule_ids,
       region_config_version: configVersion,
-      draft_response: draft,
+      draft_response: v.draft_response,
       final_response: finalResponse
     }))
 

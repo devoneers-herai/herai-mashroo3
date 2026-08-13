@@ -7,7 +7,8 @@ type ServiceRequest = Request & { services?: { supabase?: any }; user?: { id: st
 
 const router = Router()
 
-// Register new council member (requires JWT authentication)
+// Register new council member (requires JWT authentication).
+// The authenticated user's ID is used — no sign-up happens here.
 router.post('/register', authMiddleware, async (req: ServiceRequest, res: Response) => {
   try {
     const { supabase } = req.services || {}
@@ -35,8 +36,9 @@ router.get('/members/:user_id', authMiddleware, async (req: ServiceRequest, res:
   }
 })
 
-// Approve member (Should ideally be protected by a super-admin check, keeping it simple for now)
-router.post('/members/:user_id/approve', authMiddleware, async (req: ServiceRequest, res: Response) => {
+// Approve member — requires caller to be an approved council member (councilMiddleware).
+// This prevents self-approval and restricts the action to approved council members only.
+router.post('/members/:user_id/approve', authMiddleware, councilMiddleware, async (req: ServiceRequest, res: Response) => {
   try {
     const { supabase } = req.services || {}
     const { user_id } = req.params
@@ -49,8 +51,8 @@ router.post('/members/:user_id/approve', authMiddleware, async (req: ServiceRequ
   }
 })
 
-// Reject member
-router.post('/members/:user_id/reject', authMiddleware, async (req: ServiceRequest, res: Response) => {
+// Reject member — requires caller to be an approved council member (councilMiddleware).
+router.post('/members/:user_id/reject', authMiddleware, councilMiddleware, async (req: ServiceRequest, res: Response) => {
   try {
     const { supabase } = req.services || {}
     const { user_id } = req.params
@@ -63,7 +65,7 @@ router.post('/members/:user_id/reject', authMiddleware, async (req: ServiceReque
   }
 })
 
-// Create rule - Requires FULL council approval
+// Create rule — requires FULL council approval
 router.post('/rules', authMiddleware, councilMiddleware, async (req: ServiceRequest, res: Response, next: NextFunction) => {
   try {
     const { supabase } = req.services || {}
@@ -75,9 +77,9 @@ router.post('/rules', authMiddleware, councilMiddleware, async (req: ServiceRequ
     const userId = req.user?.id
 
     payload.created_by = userId
-    // Generate UUID rule_id if missing
+    // Generate rule_id if missing
     if (!payload.rule_id) {
-       payload.rule_id = 'rule-' + Math.random().toString(36).substring(2, 9)
+      payload.rule_id = 'rule-' + Math.random().toString(36).substring(2, 9)
     }
 
     const { data, error } = await supabase.from('rules').insert([payload]).select().single()
