@@ -42,10 +42,15 @@ create table public.rules (
 
 create table public.conversations (
   id uuid primary key default gen_random_uuid(),
-  region_code text not null,
-  region_config_version text not null,
+  region text,
+  region_code text,
+  region_config_version text,
+  domain text,
   domain_scope text,
-  scrubbed_message text not null,
+  persona text,
+  message text not null,
+  scrubbed_message text,
+  draft text,
   created_at timestamptz not null default now()
 );
 

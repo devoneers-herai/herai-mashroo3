@@ -1,10 +1,10 @@
 import { generateDraft, evaluateSafety } from './ai.service'
 
-type ChatInput = { message: string; region?: string; persona?: string }
+type ChatInput = { message: string; region?: string; persona?: string; domain?: string }
 
 export async function handleChatLogic(input: ChatInput, deps: { supabase: any; openaiKey: string }) {
   // 1. scrub
-  // 2. generate draft
+  // 2. generate draft (with domain-specific expertise)
   // 3. evaluate safety
   // 4. persist verdict + conversation
 
@@ -13,7 +13,7 @@ export async function handleChatLogic(input: ChatInput, deps: { supabase: any; o
   // simple scrub placeholder
   const scrubbed = input.message.replace(/\b\S+@\S+\.\S+\b/g, '[REDACTED]')
 
-  const draft = await generateDraft({ message: scrubbed, region: input.region, persona: input.persona }, openaiKey)
+  const draft = await generateDraft({ message: scrubbed, region: input.region, persona: input.persona, domain: input.domain }, openaiKey)
   const verdict = await evaluateSafety(draft, openaiKey)
 
   // persist conversation and verdict (simplified)
@@ -21,6 +21,7 @@ export async function handleChatLogic(input: ChatInput, deps: { supabase: any; o
     await supabase.from('conversations').insert([{
       region: input.region || 'EG',
       persona: input.persona || null,
+      domain: input.domain || null,
       message: scrubbed,
       draft,
     }])

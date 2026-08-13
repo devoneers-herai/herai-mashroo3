@@ -8,10 +8,10 @@ const router = Router()
 
 router.post('/', async (req: ServiceRequest, res: Response, next: NextFunction) => {
   try {
-    const { message, region, persona } = req.body
+    const { message, region, persona, domain } = req.body
     const { supabase, OPENAI_API_KEY } = req.services || {}
 
-    const output = await handleChatLogic({ message, region, persona }, {
+    const output = await handleChatLogic({ message, region, persona, domain }, {
       supabase,
       openaiKey: OPENAI_API_KEY as string,
     })
