@@ -33,7 +33,9 @@ async function main() {
 
   // attach dependencies to request (simple DI)
   app.use((req, _res, next) => {
-    ;(req as any).services = { supabase, OPENAI_API_KEY: cfg.OPENAI_API_KEY }
+    // create a fresh client per request to avoid polluting global auth state across requests
+    const reqSupabase = createSupabaseClient(cfg.SUPABASE_URL, cfg.SUPABASE_SERVICE_ROLE_KEY)
+    ;(req as any).services = { supabase: reqSupabase, OPENAI_API_KEY: cfg.OPENAI_API_KEY }
     next()
   })
 

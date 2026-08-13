@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import authMiddleware from '../middleware/auth.middleware'
-import { councilMiddleware } from '../middleware/council.middleware'
+import councilMiddleware from '../middleware/council.middleware'
 import { registerCouncilMember, getCouncilMemberStatus, updateCouncilMemberStatus } from '../services/council.service'
 
 type ServiceRequest = Request & { services?: { supabase?: any }; user?: { id: string; email: string } }

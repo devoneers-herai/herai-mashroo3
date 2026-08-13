@@ -1,4 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import getServerConfig from '../config/server.config'
+import createSupabaseClient from '../db/supabase'
 
 export type RegisterInput = {
   email: string
@@ -55,8 +57,11 @@ export async function register(
     throw new Error('No user ID returned from signup')
   }
 
+  const cfg = getServerConfig()
+  const adminClient = createSupabaseClient(cfg.SUPABASE_URL, cfg.SUPABASE_SERVICE_ROLE_KEY)
+
   // 2. Create user profile in public.users table
-  const { error: profileError } = await supabase.from('users').insert([
+  const { error: profileError } = await adminClient.from('users').insert([
     {
       id: userId,
       email,
