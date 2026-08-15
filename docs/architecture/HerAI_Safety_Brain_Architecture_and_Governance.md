@@ -1,4 +1,4 @@
-````markdown
+
 # HerAI Safety Brain
 Architecture, Governance, Evaluation & Human Oversight
 
