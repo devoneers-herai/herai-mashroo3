@@ -243,7 +243,8 @@ flowchart TD
     A["Safety Brain"] --> B["BLOCK"]
 
     B --> C["Log full safety decision"]
-    B --> D["Store matched_rule_ids + rule version"]
+    B --> D["Store matched_rule_ids +
+ rule version"]
     B --> E["Create Human Review Case<br/>if eligible"]
     B --> F["User receives safe fallback:<br/>This request needs human review."]
 
