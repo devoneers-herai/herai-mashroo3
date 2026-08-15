@@ -18,6 +18,7 @@ if (fs.existsSync(envPath)) {
 
 import express from 'express'
 import bodyParser from 'body-parser'
+import cors from 'cors'
 import authRoutes from './routes/auth.routes'
 import chatRoutes from './routes/chat.routes'
 import councilRoutes from './routes/council.routes'
@@ -28,8 +29,15 @@ async function main() {
   const cfg = getServerConfig()
   const supabase = createSupabaseClient(cfg.SUPABASE_URL, cfg.SUPABASE_SERVICE_ROLE_KEY)
 
-  const app = express()
-  app.use(bodyParser.json())
+ const app = express()
+
+app.use(
+  cors({
+    origin: 'http://localhost:3000',
+  })
+)
+
+app.use(bodyParser.json())
 
   // attach dependencies to request (simple DI)
   app.use((req, _res, next) => {
@@ -43,7 +51,7 @@ async function main() {
   app.use('/api/chat', chatRoutes)
   app.use('/api/council', councilRoutes)
 
-  const port = process.env.PORT || 3000
+  const port = process.env.PORT || 4000
   app.listen(port, () => console.log(`API listening on ${port}`))
 }
 
