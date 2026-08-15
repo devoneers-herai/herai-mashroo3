@@ -1,4 +1,3 @@
-
 # HerAI Safety Brain
 Architecture, Governance, Evaluation & Human Oversight
 
@@ -16,26 +15,26 @@ The current system pipeline is: Receive → Scrub → Load Config → Generate �
 
 ```mermaid
 flowchart TD
-    A[User] --> B[Access Layer]
-    B --> C[Backend API]
-    C --> D[PII Scrubbing]
-    D --> E[Load Region Config]
-    E --> F[Advisory Layer / LLM]
-    F --> G[Generated Draft]
-    G --> H[Safety Brain]
+    A["User"] --> B["Access Layer"]
+    B --> C["Backend API"]
+    C --> D["PII Scrubbing"]
+    D --> E["Load Region Config"]
+    E --> F["Advisory Layer / LLM"]
+    F --> G["Generated Draft"]
+    G --> H["Safety Brain"]
 
-    H --> I{SAFE / ADJUST / BLOCK}
+    H --> I{"SAFE / ADJUST / BLOCK"}
 
-    I -->|SAFE| J[Deliver]
-    I -->|ADJUST| K[Rewrite under rule]
-    K --> L[Re-check]
+    I -->|SAFE| J["Deliver"]
+    I -->|ADJUST| K["Rewrite under rule"]
+    K --> L["Re-check"]
     L --> H
-    I -->|BLOCK| M[Withhold]
-    M --> N[Fallback / Human route]
+    I -->|BLOCK| M["Withhold"]
+    M --> N["Fallback / Human route"]
 
-    J --> O[Log Verdict]
+    J --> O["Log Verdict"]
     N --> O
-    O --> P[Data Layer]
+    O --> P["Data Layer"]
 ````
 
 The current safety contract also requires separate bias_score and risk_score values, matched_rule_ids, verdict logging, fail-closed behavior on safety errors/timeouts, no token streaming, and a human-assistance route for BLOCK cases.
@@ -44,29 +43,29 @@ The current safety contract also requires separate bias_score and risk_score val
 
 ```mermaid
 flowchart TD
-    A[Governance / Council<br/>Rules + RuleSets + Versions]
-    A -->|publish / approve| B[Rules Registry / Store<br/>immutable versions + status]
+    A["Governance / Council<br/>Rules + RuleSets + Versions"]
+    A -->|publish / approve| B["Rules Registry / Store<br/>immutable versions + status"]
 
-    B -->|active_safety_ruleset_id| C[Region Config Loader]
+    B -->|active_safety_ruleset_id| C["Region Config Loader"]
 
-    U[User] --> D[Backend Chat]
+    U["User"] --> D["Backend Chat"]
     D --> C
-    C --> E[LLM / AI Service]
-    E -->|draft| F[Safety Brain]
+    C --> E["LLM / AI Service"]
+    E -->|draft| F["Safety Brain"]
 
-    F --> G[Rule Applicability]
-    F --> H[Bias Detector]
-    F --> I[Risk Scorer]
+    F --> G["Rule Applicability"]
+    F --> H["Bias Detector"]
+    F --> I["Risk Scorer"]
 
-    G --> J[Decision Engine]
+    G --> J["Decision Engine"]
     H --> J
     I --> J
 
-    J -->|SAFE| K[Deliver]
-    J -->|ADJUST| L[Rewrite + Re-check]
-    J -->|BLOCK| M[Withhold + Human route]
+    J -->|SAFE| K["Deliver"]
+    J -->|ADJUST| L["Rewrite + Re-check"]
+    J -->|BLOCK| M["Withhold + Human route"]
 
-    K --> N[Log]
+    K --> N["Log"]
     L --> F
     M --> N
 ```
@@ -90,14 +89,14 @@ The current region configuration already contains active_safety_ruleset_id. The 
 
 ```mermaid
 flowchart TD
-    A[Council Portal]
-    A --> B[Council creates/modifies rule]
-    B --> C[Validation]
-    C --> D[Council approval / publish]
-    D --> E[Create immutable RuleSet version]
-    E --> F[Registry marks version ACTIVE]
-    F --> G[Region Config points to active_safety_ruleset_id]
-    G --> H[Runtime Safety Brain resolves that exact RuleSet]
+    A["Council Portal"]
+    A --> B["Council creates/modifies rule"]
+    B --> C["Validation"]
+    C --> D["Council approval / publish"]
+    D --> E["Create immutable RuleSet version"]
+    E --> F["Registry marks version ACTIVE"]
+    F --> G["Region Config points to active_safety_ruleset_id"]
+    G --> H["Runtime Safety Brain resolves that exact RuleSet"]
 ```
 
 Recommended lifecycle:
@@ -171,13 +170,13 @@ Rules should be written as structured governance objects, not as free-form parag
 
 ```mermaid
 flowchart TD
-    A[Request:<br/>region_code = EG<br/>domain_scope = finance]
-    A --> B[Load Region Config]
-    B --> C[active_safety_ruleset_id = EG-CORE-V3]
-    C --> D[Load RuleSet EG-CORE-V3]
-    D --> E[Filter by:<br/>region_code<br/>domain_scope<br/>rule status<br/>rule applicability]
-    E --> F[Evaluate draft]
-    F --> G[matched_rule_ids = EG-SAFETY-0012, ...]
+    A["Request:<br/>region_code = EG<br/>domain_scope = finance"]
+    A --> B["Load Region Config"]
+    B --> C["active_safety_ruleset_id = EG-CORE-V3"]
+    C --> D["Load RuleSet EG-CORE-V3"]
+    D --> E["Filter by:<br/>region_code<br/>domain_scope<br/>rule status<br/>rule applicability"]
+    E --> F["Evaluate draft"]
+    F --> G["matched_rule_ids = EG-SAFETY-0012, ..."]
 ```
 
 The Safety Brain should never retrieve an arbitrary latest rule. It should resolve the exact active RuleSet version specified by region configuration, then apply only rules valid for the request's domain and scope.
@@ -188,31 +187,31 @@ The LLM can assist with classification and evidence extraction, but the final sa
 
 ```mermaid
 flowchart TD
-    A[Draft] --> B[Evaluate each applicable rule]
+    A["Draft"] --> B["Evaluate each applicable rule"]
 
-    B --> C[Bias evaluation]
-    C --> D[bias_score + findings]
+    B --> C["Bias evaluation"]
+    C --> D["bias_score + findings"]
 
-    B --> E[Risk evaluation]
-    E --> F[risk_score + findings]
+    B --> E["Risk evaluation"]
+    E --> F["risk_score + findings"]
 
-    B --> G[Rule findings]
-    G --> H[matched_rule_ids]
+    B --> G["Rule findings"]
+    G --> H["matched_rule_ids"]
 
-    D --> I[Decision Engine]
+    D --> I["Decision Engine"]
     F --> I
     H --> I
 
-    I --> J{Hard BLOCK condition?}
-    J -->|Yes| K[BLOCK]
+    I --> J{"Hard BLOCK condition?"}
+    J -->|Yes| K["BLOCK"]
 
-    J -->|No| L{Safety evaluation failed?}
+    J -->|No| L{"Safety evaluation failed?"}
     L -->|Yes| K
 
-    L -->|No| M{Correctable violation?}
-    M -->|Yes| N[ADJUST]
+    L -->|No| M{"Correctable violation?"}
+    M -->|Yes| N["ADJUST"]
 
-    M -->|No| O[SAFE]
+    M -->|No| O["SAFE"]
 ```
 
 Thresholds and hard-block conditions should be configuration-driven and versioned. The exact numeric thresholds are not defined in the current architecture documents and should therefore be agreed as part of implementation and Council governance.
@@ -221,16 +220,16 @@ Thresholds and hard-block conditions should be configuration-driven and versione
 
 ```mermaid
 flowchart TD
-    A[Draft] --> B[Safety Brain]
-    B --> C[ADJUST]
-    C --> D[Identify matched rule(s)]
-    D --> E[Rewrite under rule instruction]
-    E --> F[Re-check full Safety Brain]
+    A["Draft"] --> B["Safety Brain"]
+    B --> C["ADJUST"]
+    C --> D["Identify matched rules"]
+    D --> E["Rewrite under rule instruction"]
+    E --> F["Re-check full Safety Brain"]
 
-    F -->|SAFE| G[Deliver]
-    F -->|ADJUST| H[Apply bounded retry policy]
+    F -->|SAFE| G["Deliver"]
+    F -->|ADJUST| H["Apply bounded retry policy"]
     H --> B
-    F -->|BLOCK| I[Withhold + log + human route if eligible]
+    F -->|BLOCK| I["Withhold + log + human route if eligible"]
 ```
 
 The current contract explicitly requires a re-check after an ADJUST. A practical implementation should also define a maximum retry count to avoid loops; the exact number is a proposed implementation parameter, not a current contract value.
@@ -241,21 +240,21 @@ A BLOCK must not expose the blocked draft. The system should instead return an a
 
 ```mermaid
 flowchart TD
-    A[Safety Brain] --> B[BLOCK]
+    A["Safety Brain"] --> B["BLOCK"]
 
-    B --> C[Log full safety decision]
-    B --> D[Store matched_rule_ids + rule version]
-    B --> E[Create Human Review Case<br/>(if eligible)]
-    B --> F[User receives safe fallback:<br/>"This request needs human review."]
+    B --> C["Log full safety decision"]
+    B --> D["Store matched_rule_ids + rule version"]
+    B --> E["Create Human Review Case<br/>if eligible"]
+    B --> F["User receives safe fallback:<br/>This request needs human review."]
 
-    E --> G[Council / approved reviewer]
-    G --> H[Review original user request]
+    E --> G["Council / approved reviewer"]
+    G --> H["Review original user request"]
 
-    H --> I{Human decision}
-    I -->|Approve/answer| J[Human response]
-    I -->|Keep blocked| K[Final fallback]
+    H --> I{"Human decision"}
+    I -->|Approve / answer| J["Human response"]
+    I -->|Keep blocked| K["Final fallback"]
 
-    J --> L[Audit trail]
+    J --> L["Audit trail"]
     K --> L
 ```
 
@@ -280,19 +279,19 @@ The Safety Brain should not autonomously retrain or rewrite its own production s
 
 ```mermaid
 flowchart TD
-    A[Rule / model change] --> B[Offline Evaluation Harness]
+    A["Rule / model change"] --> B["Offline Evaluation Harness"]
 
-    B --> C[Test suite]
+    B --> C["Test suite"]
 
-    C --> D[known SAFE cases]
-    C --> E[known BLOCK cases]
-    C --> F[known ADJUST cases]
-    C --> G[bias cases]
-    C --> H[risk cases]
-    C --> I[adversarial cases]
-    C --> J[regression cases]
+    C --> D["known SAFE cases"]
+    C --> E["known BLOCK cases"]
+    C --> F["known ADJUST cases"]
+    C --> G["bias cases"]
+    C --> H["risk cases"]
+    C --> I["adversarial cases"]
+    C --> J["regression cases"]
 
-    D --> K[Metrics + failure analysis]
+    D --> K["Metrics + failure analysis"]
     E --> K
     F --> K
     G --> K
@@ -300,9 +299,9 @@ flowchart TD
     I --> K
     J --> K
 
-    K --> L[Human / Council approval]
-    L --> M[Publish candidate RuleSet / evaluator version]
-    M --> N[Production activation]
+    K --> L["Human / Council approval"]
+    L --> M["Publish candidate RuleSet / evaluator version"]
+    M --> N["Production activation"]
 ```
 
 ## 14. Evaluation Dataset
@@ -428,51 +427,51 @@ This document is an extension of the existing System Architecture, Safety Contra
 ```mermaid
 flowchart TD
     subgraph CG["COUNCIL GOVERNANCE"]
-        A[Council Portal]
-        A --> B[Draft Rule → Review → Approve → Publish]
-        B --> C[Immutable RuleSet Version]
-        C --> D[Region Config: active_safety_ruleset_id]
+        A["Council Portal"]
+        A --> B["Draft Rule → Review → Approve → Publish"]
+        B --> C["Immutable RuleSet Version"]
+        C --> D["Region Config: active_safety_ruleset_id"]
     end
 
     subgraph RT["RUNTIME"]
-        U[User]
-        U --> E[Backend]
-        E --> F[PII Scrub]
-        F --> G[Region Config]
-        G --> H[LLM]
-        H --> I[Draft]
+        U["User"]
+        U --> E["Backend"]
+        E --> F["PII Scrub"]
+        F --> G["Region Config"]
+        G --> H["LLM"]
+        H --> I["Draft"]
 
-        I --> J[SAFETY BRAIN]
+        I --> J["SAFETY BRAIN"]
 
-        J --> K[Rules Match]
-        J --> L[Bias Detector]
-        J --> M[Risk Scorer]
+        J --> K["Rules Match"]
+        J --> L["Bias Detector"]
+        J --> M["Risk Scorer"]
 
-        K --> N[Decision Engine]
+        K --> N["Decision Engine"]
         L --> N
         M --> N
 
-        N -->|SAFE| O[Deliver]
-        N -->|ADJUST| P[Rewrite]
-        P --> Q[Re-check]
+        N -->|SAFE| O["Deliver"]
+        N -->|ADJUST| P["Rewrite"]
+        P --> Q["Re-check"]
         Q --> J
-        N -->|BLOCK| R[Withhold]
-        R --> S[Human route]
+        N -->|BLOCK| R["Withhold"]
+        R --> S["Human route"]
 
-        O --> T[Log]
+        O --> T["Log"]
         S --> T
-        T --> V[Audit/Data]
+        T --> V["Audit/Data"]
     end
 
     D --> G
     D --> J
 
     subgraph EL["EVALUATION LOOP (OFFLINE)"]
-        W[Candidate RuleSet / Evaluator]
-        W --> X[Golden + Adversarial + Regression Tests]
-        X --> Y[Metrics + Failure Analysis]
-        Y --> Z[Human/Council Approval]
-        Z --> AA[Publish new immutable version]
+        W["Candidate RuleSet / Evaluator"]
+        W --> X["Golden + Adversarial + Regression Tests"]
+        X --> Y["Metrics + Failure Analysis"]
+        Y --> Z["Human/Council Approval"]
+        Z --> AA["Publish new immutable version"]
     end
 
     AA --> C
@@ -481,6 +480,3 @@ flowchart TD
 ## 24. Key Principle
 
 The Safety Brain should not be an autonomous second LLM that simply says “safe” or “unsafe.” It should be an auditable control layer: versioned Council rules + structured evaluation + deterministic decision policy + re-checking + human escalation + complete traceability.
-
-```
-```
