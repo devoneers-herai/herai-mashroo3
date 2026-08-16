@@ -40,49 +40,68 @@ export async function register(
   input: RegisterInput,
   supabase: SupabaseClient
 ): Promise<AuthResponse> {
-  const { email, password, firstName, lastName, age, domain, country, city, phoneNumber } = input
-
-  // 1. Create Supabase Auth account
-  const { data: authData, error: signUpError } = await supabase.auth.signUp({
+  const {
     email,
     password,
-  })
+    firstName,
+    lastName,
+    age,
+    domain,
+    country,
+    city,
+    phoneNumber,
+  } = input
+
+  // 1. Create Supabase Auth account
+  const { data: authData, error: signUpError } =
+    await supabase.auth.signUp({
+      email,
+      password,
+    })
 
   if (signUpError) {
     throw new Error(`Auth signup failed: ${signUpError.message}`)
   }
 
   const userId = authData?.user?.id
+
   if (!userId) {
     throw new Error('No user ID returned from signup')
   }
 
   const cfg = getServerConfig()
-  const adminClient = createSupabaseClient(cfg.SUPABASE_URL, cfg.SUPABASE_SERVICE_ROLE_KEY)
+
+  const adminClient = createSupabaseClient(
+    cfg.SUPABASE_URL,
+    cfg.SUPABASE_SERVICE_ROLE_KEY
+  )
 
   // 2. Create user profile in public.users table
-  const { error: profileError } = await adminClient.from('users').insert([
-    {
-      id: userId,
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      age,
-      domain,
-      country,
-      city,
-      phone_number: phoneNumber,
-    },
-  ])
+  const { error: profileError } = await adminClient
+    .from('users')
+    .insert([
+      {
+        id: userId,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        age,
+        domain,
+        country,
+        city,
+        phone_number: phoneNumber,
+      },
+    ])
 
   if (profileError) {
-    // If profile creation fails, the auth account exists but profile doesn't
-    // In production, you might want to rollback or handle this more carefully
     console.error('Profile creation failed:', profileError)
-    throw new Error(`Profile creation failed: ${profileError.message}`)
+
+    throw new Error(
+      `Profile creation failed: ${profileError.message}`
+    )
   }
 
-  // 3. Return auth response (session info)
+  // 3. Return authentication response
   return {
     user: {
       id: userId,
@@ -99,40 +118,95 @@ export async function register(
 
 /**
  * Login with email and password.
- * Returns authenticated session with access token.
+ * Returns authenticated session and the user's profile information.
  */
-export async function login(input: LoginInput, supabase: SupabaseClient): Promise<AuthResponse> {
+export async function login(
+  input: LoginInput,
+  supabase: SupabaseClient
+): Promise<AuthResponse> {
   const { email, password } = input
 
-  const { data: authData, error: loginError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+  // 1. Authenticate with Supabase
+  const { data: authData, error: loginError } =
+    await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
 
   if (loginError) {
-    throw new Error(`Login failed: ${loginError.message}`)
+    throw new Error(
+      `Login failed: ${loginError.message}`
+    )
   }
 
   const user = authData?.user
   const session = authData?.session
 
   if (!user || !session) {
-    throw new Error('No user or session returned from login')
+    throw new Error(
+      'No user or session returned from login'
+    )
   }
 
-  // Fetch user profile
-  const { data: profileData } = await supabase
-    .from('users')
-    .select('first_name, last_name')
-    .eq('id', user.id)
-    .single()
+  // 2. Create a server-side admin client.
+  // The service-role client allows the backend to read
+  // the profile from public.users even when RLS policies
+  // prevent the normal client from reading it.
+  const cfg = getServerConfig()
 
+  const adminClient = createSupabaseClient(
+    cfg.SUPABASE_URL,
+    cfg.SUPABASE_SERVICE_ROLE_KEY
+  )
+
+  // 3. Fetch the user's profile from public.users.
+  const { data: profileData, error: profileError } =
+    await adminClient
+      .from('users')
+      .select('first_name, last_name')
+      .eq('id', user.id)
+      .maybeSingle()
+
+  if (profileError) {
+    console.error(
+      'Failed to fetch user profile:',
+      profileError
+    )
+
+    throw new Error(
+      `Failed to fetch user profile: ${profileError.message}`
+    )
+  }
+
+  // 4. If no profile exists, still return the authenticated
+  // user. This keeps login from failing just because the
+  // profile row is missing.
+  if (!profileData) {
+    console.warn(
+      `No profile found in public.users for user ID: ${user.id}`
+    )
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email || '',
+      },
+      session: {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      },
+    }
+  }
+
+  // 5. Return the authenticated user together with the
+  // profile names using the camelCase fields expected
+  // by the frontend.
   return {
     user: {
       id: user.id,
       email: user.email || '',
-      firstName: profileData?.first_name,
-      lastName: profileData?.last_name,
+      firstName: profileData.first_name || undefined,
+      lastName: profileData.last_name || undefined,
     },
     session: {
       access_token: session.access_token,
@@ -145,14 +219,26 @@ export async function login(input: LoginInput, supabase: SupabaseClient): Promis
  * Verify JWT token and return authenticated user ID.
  * Used by middleware to check if request has valid auth.
  */
-export async function verifyToken(token: string, supabase: SupabaseClient): Promise<string> {
-  const { data, error } = await supabase.auth.getUser(token)
+export async function verifyToken(
+  token: string,
+  supabase: SupabaseClient
+): Promise<string> {
+  const { data, error } =
+    await supabase.auth.getUser(token)
 
   if (error || !data?.user?.id) {
-    throw new Error(`Token verification failed: ${error?.message || 'no user'}`)
+    throw new Error(
+      `Token verification failed: ${
+        error?.message || 'no user'
+      }`
+    )
   }
 
   return data.user.id
 }
 
-export default { register, login, verifyToken }
+export default {
+  register,
+  login,
+  verifyToken,
+}

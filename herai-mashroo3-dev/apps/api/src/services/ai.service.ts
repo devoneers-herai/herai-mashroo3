@@ -4,6 +4,7 @@ type DraftInput = {
   persona?: string
   domain?: string
   adjustmentInstruction?: string
+  language?: string
 }
 
 // Domain-specific system prompts
@@ -52,10 +53,15 @@ type Verdict = {
   matched_rule_ids: string[]
 }
 
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
+const OPENAI_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
-async function openaiChat(messages: {role: string; content: string}[], model = 'gpt-4o-mini', apiKey?: string) {
+async function openaiChat(messages: {role: string; content: string}[], model = 'llama-3.1-8b-instant', apiKey?: string, jsonMode = false) {
   if (!apiKey) throw new Error('OPENAI_API_KEY is required')
+
+  const payload: any = { model, messages, max_tokens: 800, temperature: 0.2 }
+  if (jsonMode) {
+    payload.response_format = { type: 'json_object' }
+  }
 
   const res = await fetch(OPENAI_API_URL, {
     method: 'POST',
@@ -63,7 +69,7 @@ async function openaiChat(messages: {role: string; content: string}[], model = '
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model, messages, max_tokens: 800, temperature: 0.2 }),
+    body: JSON.stringify(payload),
   })
 
   if (!res.ok) {
@@ -84,8 +90,9 @@ function getSystemPrompt(input: DraftInput): string {
   const regionContext = input.region ? `\nRegion: ${input.region}` : ''
   const personaContext = input.persona ? ` (Persona: ${input.persona})` : ''
   const adjustmentContext = input.adjustmentInstruction ? `\nCRITICAL INSTRUCTION: ${input.adjustmentInstruction}` : ''
+  const languageContext = input.language ? `\nIMPORTANT: You MUST respond in ${input.language === 'ar' ? 'Arabic' : 'English'}, regardless of the language the user types in.` : ''
   
-  return `${domainPrompt}${regionContext}${personaContext}${adjustmentContext}`
+  return `${domainPrompt}${regionContext}${personaContext}${adjustmentContext}${languageContext}`
 }
 
 export async function generateDraft(input: DraftInput, openaiApiKey: string): Promise<string> {
@@ -98,7 +105,7 @@ export async function generateDraft(input: DraftInput, openaiApiKey: string): Pr
     { role: 'user', content: input.message },
   ]
 
-  const reply = await openaiChat(messages, 'gpt-4o-mini', apiKey)
+  const reply = await openaiChat(messages, 'llama-3.1-8b-instant', apiKey)
   return reply
 }
 
@@ -113,10 +120,18 @@ export async function evaluateSafety(draft: string, openaiApiKey: string): Promi
     { role: 'user', content: instruction },
   ]
 
-  const reply = await openaiChat(messages, 'gpt-4o-mini', apiKey)
+  const reply = await openaiChat(messages, 'llama-3.1-8b-instant', apiKey, true)
 
   try {
-    const parsed = JSON.parse(reply)
+    let cleanReply = reply.trim()
+    
+    // Attempt to extract JSON if it was wrapped in code blocks or conversational padding
+    const jsonMatch = cleanReply.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      cleanReply = jsonMatch[0]
+    }
+    
+    const parsed = JSON.parse(cleanReply)
     return {
       bias_score: Number(parsed.bias_score ?? 0),
       risk_score: Number(parsed.risk_score ?? 0),

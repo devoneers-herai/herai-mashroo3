@@ -6,31 +6,46 @@ import Link from "next/link";
 type User = {
   id: string;
   email?: string;
-  firstName?: string;
-  lastName?: string;
+  first_name?: string;
+  last_name?: string;
 };
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem("herai_user");
+useEffect(() => {
+  const storedUser = localStorage.getItem("herai_user");
 
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem("herai_user");
-      }
+  if (storedUser) {
+    try {
+      const parsedUser = JSON.parse(storedUser);
+
+      setUser({
+        id: parsedUser.id,
+        email: parsedUser.email,
+        firstName:
+          parsedUser.firstName ||
+          parsedUser.first_name ||
+          "",
+        lastName:
+          parsedUser.lastName ||
+          parsedUser.last_name ||
+          "",
+      });
+    } catch {
+      localStorage.removeItem("herai_user");
     }
+  }
 
-    setLoading(false);
-  }, []);
+  setLoading(false);
+}, []);
 
   function handleLogout() {
     localStorage.removeItem("herai_user");
     localStorage.removeItem("herai_session");
+    localStorage.removeItem("herai_access_token");
+    localStorage.removeItem("herai_refresh_token");
 
     window.location.href = "/login";
   }
