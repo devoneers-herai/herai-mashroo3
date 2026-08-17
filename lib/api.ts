@@ -12,14 +12,8 @@ export type ChatRequest = {
 
 export type ChatResponse = {
   response: string;
-  safety_flag: "safe" | "adjust" | "block";
+  safety_flag: "safe" | "block";
   conversation_id?: string;
-  verdict?: {
-    action: "safe" | "adjust" | "block";
-    bias_score: number;
-    risk_score: number;
-    matched_rule_ids: string[];
-  };
 };
 
 export type Conversation = {

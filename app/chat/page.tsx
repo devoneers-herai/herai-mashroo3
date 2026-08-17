@@ -196,7 +196,7 @@ export default function ChatPage() {
 
       const token =
         localStorage.getItem("herai_access_token") ||
-        localStorage.getItem("herai_session") ||
+        
         "";
 
       if (!token) {
@@ -248,7 +248,7 @@ export default function ChatPage() {
 
       const token =
         localStorage.getItem("herai_access_token") ||
-        localStorage.getItem("herai_session") ||
+        
         "";
 
       if (!token) {
@@ -293,7 +293,7 @@ export default function ChatPage() {
 
       const token =
         localStorage.getItem("herai_access_token") ||
-        localStorage.getItem("herai_session") ||
+        
         "";
 
       if (!token) {
@@ -351,7 +351,7 @@ export default function ChatPage() {
     try {
       const token =
         localStorage.getItem("herai_access_token") ||
-        localStorage.getItem("herai_session") ||
+        
         "";
 
       if (!token) {

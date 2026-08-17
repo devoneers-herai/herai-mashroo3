@@ -12,16 +12,6 @@ type ChatInput = {
   language?: string
 }
 
-/**
- * Creates a short, readable conversation title from the user's
- * first message.
- *
- * Example:
- * "How should I price my handmade candles?"
- * -> "How should I price my handmade candles?"
- *
- * Long messages are shortened to keep the sidebar clean.
- */
 function createConversationTitle(message: string): string {
   const cleaned = message
     .replace(/\s+/g, ' ')
@@ -39,8 +29,6 @@ function createConversationTitle(message: string): string {
   }
 
   const shortened = cleaned.slice(0, maxLength)
-
-  // Try not to cut in the middle of a word.
   const lastSpace = shortened.lastIndexOf(' ')
 
   if (lastSpace > 25) {
@@ -49,6 +37,9 @@ function createConversationTitle(message: string): string {
 
   return `${shortened}...`
 }
+
+const BLOCKED_RESPONSE =
+  'I cannot provide a response to that request due to safety policies.'
 
 export async function handleChatLogic(
   input: ChatInput,
@@ -59,15 +50,14 @@ export async function handleChatLogic(
   const regionCode = input.region_code || 'EG'
   const domainScope = input.domain_scope || undefined
 
-  // 1. Resolve Region Config at runtime
+  // 1. Resolve region configuration
   const regionConfig = getRegionConfig(regionCode)
   const configVersion = regionConfig.version
 
-  // 2. Scrub PII
+  // 2. Scrub PII before sending the message to the LLM
   const scrubbed = await scrub(input.message)
 
   let finalResponse = ''
-  let verdict: any = null
   const verdictsToSave: any[] = []
 
   // 3. Generate + safety pipeline
@@ -83,13 +73,26 @@ export async function handleChatLogic(
       openaiKey
     )
 
-    // 4. Initial safety evaluation
-    verdict = await evaluateSafety(draft, openaiKey)
-    verdict.draft_response = draft
-    verdictsToSave.push(verdict)
+    // First safety evaluation
+    let verdict = await evaluateSafety(draft, openaiKey)
 
-    // 5. ADJUST re-check flow
-    if (verdict.action === 'adjust') {
+    verdictsToSave.push({
+      ...verdict,
+      draft_response: draft,
+    })
+
+    // SAFE:
+    // The draft passed the safety check and can become the
+    // user-facing response.
+    if (verdict.action === 'safe') {
+      finalResponse = draft
+    }
+
+    // ADJUST:
+    // This is an INTERNAL safety operation.
+    // The user/frontend never receives the original draft
+    // or the "adjust" action.
+    else if (verdict.action === 'adjust') {
       draft = await generateDraft(
         {
           message: scrubbed,
@@ -98,46 +101,55 @@ export async function handleChatLogic(
           domain: domainScope,
           language: input.language,
           adjustmentInstruction:
-            'Ensure the response completely avoids any biased or high-risk language.',
+            'Rewrite the response to completely avoid biased, discriminatory, unsafe, or high-risk language. Return only the revised user-facing answer.',
         },
         openaiKey
       )
 
+      // The adjusted draft MUST be evaluated again.
       verdict = await evaluateSafety(draft, openaiKey)
-      verdict.draft_response = draft
-      verdictsToSave.push(verdict)
+
+      verdictsToSave.push({
+        ...verdict,
+        draft_response: draft,
+      })
+
+      // Only the second SAFE result can reach the user.
+      if (verdict.action === 'safe') {
+        finalResponse = draft
+      } else {
+        finalResponse = BLOCKED_RESPONSE
+      }
     }
 
-    finalResponse = draft
-
-    // 6. Handle BLOCK
-    if (verdict.action === 'block') {
-      finalResponse =
-        'I cannot provide a response to that request due to safety policies.'
+    // BLOCK:
+    // Never expose the generated draft to the frontend.
+    else {
+      finalResponse = BLOCKED_RESPONSE
     }
   } catch (err) {
     console.error('AI pipeline error:', err)
 
-    verdict = {
-      action: 'block',
+    // Fail closed if the AI/safety pipeline fails.
+    const fallbackVerdict = {
+      action: 'block' as const,
       bias_score: 1,
       risk_score: 1,
       matched_rule_ids: [],
       draft_response: '',
     }
 
-    finalResponse =
-      'I cannot provide a response to that request due to safety policies.'
+    finalResponse = BLOCKED_RESPONSE
 
-    verdictsToSave.push(verdict)
+    verdictsToSave.push(fallbackVerdict)
   }
 
-  // 7. Get or create the conversation
+  // 4. Get or create the conversation
   let conversationId = input.conversation_id
 
   try {
     if (conversationId) {
-      // Make sure this conversation belongs to the authenticated user.
+      // Conversation MUST belong to the authenticated user.
       const { data: existingConversation, error: conversationError } =
         await supabase
           .from('conversations')
@@ -150,9 +162,6 @@ export async function handleChatLogic(
         throw new Error('Conversation not found')
       }
     } else {
-      // No conversation_id means this is a NEW chat.
-      //
-      // Use the first user message as the conversation title.
       const conversationTitle = createConversationTitle(input.message)
 
       const { data: conversationData, error: convError } =
@@ -170,12 +179,14 @@ export async function handleChatLogic(
           .select('id, title')
           .single()
 
-      if (convError) throw convError
+      if (convError) {
+        throw convError
+      }
 
       conversationId = conversationData.id
     }
 
-    // 8. Save the USER message
+    // 5. Save USER message
     const { error: userMessageError } = await supabase
       .from('messages')
       .insert([
@@ -186,9 +197,11 @@ export async function handleChatLogic(
         },
       ])
 
-    if (userMessageError) throw userMessageError
+    if (userMessageError) {
+      throw userMessageError
+    }
 
-    // 9. Save the ASSISTANT message
+    // 6. Save ONLY the final user-facing response
     const { error: assistantMessageError } = await supabase
       .from('messages')
       .insert([
@@ -199,9 +212,14 @@ export async function handleChatLogic(
         },
       ])
 
-    if (assistantMessageError) throw assistantMessageError
+    if (assistantMessageError) {
+      throw assistantMessageError
+    }
 
-    // 10. Save safety verdicts
+    // 7. Save safety audit records internally.
+    //
+    // draft_response, scores, actions, and matched rules remain
+    // server/database-side and are never returned to the frontend.
     const verdictsRecords = verdictsToSave.map((v) => ({
       conversation_id: conversationId,
       action: v.action,
@@ -218,17 +236,29 @@ export async function handleChatLogic(
         .from('verdicts')
         .insert(verdictsRecords)
 
-      if (verdictError) throw verdictError
+      if (verdictError) {
+        throw verdictError
+      }
     }
   } catch (e) {
     console.error('PERSIST ERROR:', e)
     throw e
   }
 
+  // IMPORTANT:
+  // The API exposes ONLY the final user-facing response and
+  // conversation identifier.
+  //
+  // No draft_response
+  // No verdict
+  // No bias_score
+  // No risk_score
+  // No matched_rule_ids
+  // No safety action/flag
+  //
+  // All Safety Brain operations remain internal.
   return {
     response: finalResponse,
-    safety_flag: verdict?.action,
-    verdict,
     conversation_id: conversationId,
   }
 }
