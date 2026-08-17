@@ -33,8 +33,17 @@ export type AuthResponse = {
 }
 
 /**
- * Register a new user with email, password, and profile info.
- * Creates a Supabase Auth account and stores user profile in public.users table.
+ * Register a normal HerAI user.
+ *
+ * This creates:
+ *
+ * 1. Supabase Auth account
+ * 2. public.users profile
+ *
+ * Council membership is intentionally NOT created here.
+ * A normal authenticated user must separately apply through:
+ *
+ * POST /api/council/register
  */
 export async function register(
   input: RegisterInput,
@@ -52,23 +61,68 @@ export async function register(
     phoneNumber,
   } = input
 
-  // 1. Create Supabase Auth account
+  // Basic service-level validation.
+  if (!email?.trim()) {
+    throw new Error('Email is required')
+  }
+
+  if (!password) {
+    throw new Error('Password is required')
+  }
+
+  if (!firstName?.trim()) {
+    throw new Error('First name is required')
+  }
+
+  if (!lastName?.trim()) {
+    throw new Error('Last name is required')
+  }
+
+  if (!Number.isFinite(age)) {
+    throw new Error('Age must be a valid number')
+  }
+
+  if (!domain?.trim()) {
+    throw new Error('Domain is required')
+  }
+
+  if (!country?.trim()) {
+    throw new Error('Country is required')
+  }
+
+  if (!city?.trim()) {
+    throw new Error('City is required')
+  }
+
+  if (!phoneNumber?.trim()) {
+    throw new Error('Phone number is required')
+  }
+
+  // 1. Create Supabase Auth account.
   const { data: authData, error: signUpError } =
     await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
     })
 
   if (signUpError) {
-    throw new Error(`Auth signup failed: ${signUpError.message}`)
+    throw new Error(
+      `Auth signup failed: ${signUpError.message}`
+    )
   }
 
   const userId = authData?.user?.id
 
   if (!userId) {
-    throw new Error('No user ID returned from signup')
+    throw new Error(
+      'No user ID returned from signup'
+    )
   }
 
+  // 2. Create server-side admin client.
+  //
+  // This client is intentionally server-only and uses
+  // the Supabase service-role key.
   const cfg = getServerConfig()
 
   const adminClient = createSupabaseClient(
@@ -76,57 +130,100 @@ export async function register(
     cfg.SUPABASE_SERVICE_ROLE_KEY
   )
 
-  // 2. Create user profile in public.users table
-  const { error: profileError } = await adminClient
-    .from('users')
-    .insert([
-      {
-        id: userId,
-        email,
-        first_name: firstName,
-        last_name: lastName,
-        age,
-        domain,
-        country,
-        city,
-        phone_number: phoneNumber,
-      },
-    ])
+  // 3. Create the public user profile.
+  const { error: profileError } =
+    await adminClient
+      .from('users')
+      .insert([
+        {
+          id: userId,
+          email: email.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          age,
+          domain: domain.trim(),
+          country: country.trim(),
+          city: city.trim(),
+          phone_number: phoneNumber.trim(),
+        },
+      ])
 
   if (profileError) {
-    console.error('Profile creation failed:', profileError)
+    console.error(
+      'Profile creation failed:',
+      profileError
+    )
+
+    // The Auth account was already created.
+    // Attempt to remove it so we do not leave an orphaned
+    // authentication account without a profile.
+    try {
+      const { error: cleanupError } =
+        await adminClient.auth.admin.deleteUser(
+          userId
+        )
+
+      if (cleanupError) {
+        console.error(
+          'Failed to clean up Auth user after profile creation failure:',
+          cleanupError
+        )
+      }
+    } catch (cleanupError) {
+      console.error(
+        'Unexpected Auth cleanup error:',
+        cleanupError
+      )
+    }
 
     throw new Error(
       `Profile creation failed: ${profileError.message}`
     )
   }
 
-  // 3. Return authentication response
+  // 4. Return the authentication response.
+  //
+  // Depending on Supabase email-confirmation settings,
+  // session may be null immediately after signup.
   return {
     user: {
       id: userId,
-      email,
-      firstName,
-      lastName,
+      email: authData.user?.email || email.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
     },
     session: {
-      access_token: authData.session?.access_token || '',
-      refresh_token: authData.session?.refresh_token,
+      access_token:
+        authData.session?.access_token || '',
+      refresh_token:
+        authData.session?.refresh_token,
     },
   }
 }
 
 /**
  * Login with email and password.
- * Returns authenticated session and the user's profile information.
+ *
+ * This authenticates the normal Supabase user.
+ * Council authorization is handled separately by
+ * councilMiddleware.
  */
 export async function login(
   input: LoginInput,
   supabase: SupabaseClient
 ): Promise<AuthResponse> {
-  const { email, password } = input
+  const email = input.email?.trim()
+  const password = input.password
 
-  // 1. Authenticate with Supabase
+  if (!email) {
+    throw new Error('Email is required')
+  }
+
+  if (!password) {
+    throw new Error('Password is required')
+  }
+
+  // 1. Authenticate with Supabase.
   const { data: authData, error: loginError } =
     await supabase.auth.signInWithPassword({
       email,
@@ -149,9 +246,9 @@ export async function login(
   }
 
   // 2. Create a server-side admin client.
-  // The service-role client allows the backend to read
-  // the profile from public.users even when RLS policies
-  // prevent the normal client from reading it.
+  //
+  // We use this to read public.users without depending
+  // on the authenticated client's RLS permissions.
   const cfg = getServerConfig()
 
   const adminClient = createSupabaseClient(
@@ -159,13 +256,17 @@ export async function login(
     cfg.SUPABASE_SERVICE_ROLE_KEY
   )
 
-  // 3. Fetch the user's profile from public.users.
-  const { data: profileData, error: profileError } =
-    await adminClient
-      .from('users')
-      .select('first_name, last_name')
-      .eq('id', user.id)
-      .maybeSingle()
+  // 3. Fetch the user's profile.
+  const {
+    data: profileData,
+    error: profileError,
+  } = await adminClient
+    .from('users')
+    .select(
+      'first_name, last_name'
+    )
+    .eq('id', user.id)
+    .maybeSingle()
 
   if (profileError) {
     console.error(
@@ -178,9 +279,10 @@ export async function login(
     )
   }
 
-  // 4. If no profile exists, still return the authenticated
-  // user. This keeps login from failing just because the
-  // profile row is missing.
+  // 4. Return authenticated user even if the profile row
+  // does not exist.
+  //
+  // This keeps authentication separate from profile data.
   if (!profileData) {
     console.warn(
       `No profile found in public.users for user ID: ${user.id}`
@@ -189,40 +291,49 @@ export async function login(
     return {
       user: {
         id: user.id,
-        email: user.email || '',
+        email: user.email || email,
       },
       session: {
         access_token: session.access_token,
-        refresh_token: session.refresh_token,
+        refresh_token:
+          session.refresh_token,
       },
     }
   }
 
-  // 5. Return the authenticated user together with the
-  // profile names using the camelCase fields expected
-  // by the frontend.
+  // 5. Return authenticated user + profile names.
   return {
     user: {
       id: user.id,
-      email: user.email || '',
-      firstName: profileData.first_name || undefined,
-      lastName: profileData.last_name || undefined,
+      email: user.email || email,
+      firstName:
+        profileData.first_name || undefined,
+      lastName:
+        profileData.last_name || undefined,
     },
     session: {
       access_token: session.access_token,
-      refresh_token: session.refresh_token,
+      refresh_token:
+        session.refresh_token,
     },
   }
 }
 
 /**
- * Verify JWT token and return authenticated user ID.
- * Used by middleware to check if request has valid auth.
+ * Verify a Supabase JWT and return its authenticated user ID.
+ *
+ * Used when backend code needs to verify a token directly.
  */
 export async function verifyToken(
   token: string,
   supabase: SupabaseClient
 ): Promise<string> {
+  if (!token) {
+    throw new Error(
+      'Token verification failed: token is required'
+    )
+  }
+
   const { data, error } =
     await supabase.auth.getUser(token)
 

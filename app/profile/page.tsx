@@ -6,46 +6,169 @@ import Link from "next/link";
 type User = {
   id: string;
   email?: string;
-  first_name?: string;
-  last_name?: string;
+  firstName?: string;
+  lastName?: string;
 };
+
+type CouncilStatus =
+  | "pending"
+  | "approved"
+  | "rejected";
+
+type CouncilMember = {
+  id?: string;
+  user_id?: string;
+  status: CouncilStatus;
+  created_at?: string;
+};
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  "http://localhost:4000";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  const storedUser = localStorage.getItem("herai_user");
+  const [councilStatus, setCouncilStatus] =
+    useState<CouncilStatus | null>(null);
 
-  if (storedUser) {
-    try {
-      const parsedUser = JSON.parse(storedUser);
+  const [councilLoading, setCouncilLoading] =
+    useState(false);
 
-      setUser({
-        id: parsedUser.id,
-        email: parsedUser.email,
-        firstName:
-          parsedUser.firstName ||
-          parsedUser.first_name ||
-          "",
-        lastName:
-          parsedUser.lastName ||
-          parsedUser.last_name ||
-          "",
-      });
-    } catch {
-      localStorage.removeItem("herai_user");
+  useEffect(() => {
+    const storedUser =
+      localStorage.getItem("herai_user");
+
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+
+        if (!parsedUser?.id) {
+          localStorage.removeItem("herai_user");
+          setLoading(false);
+          return;
+        }
+
+        setUser({
+          id: parsedUser.id,
+          email: parsedUser.email,
+          firstName:
+            parsedUser.firstName ||
+            parsedUser.first_name ||
+            "",
+          lastName:
+            parsedUser.lastName ||
+            parsedUser.last_name ||
+            "",
+        });
+      } catch {
+        localStorage.removeItem("herai_user");
+      }
     }
-  }
 
-  setLoading(false);
-}, []);
+    setLoading(false);
+  }, []);
+
+  /*
+   * Check the user's actual Council membership from
+   * the backend.
+   *
+   * Backend endpoint:
+   * GET /api/council/me
+   *
+   * Expected response:
+   * {
+   *   member: {
+   *     status: "approved" | "pending" | "rejected"
+   *   }
+   * }
+   */
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    async function loadCouncilStatus() {
+      setCouncilLoading(true);
+
+      try {
+        const token =
+          localStorage.getItem(
+            "herai_access_token"
+          );
+
+        if (!token) {
+          setCouncilStatus(null);
+          return;
+        }
+
+        const response = await fetch(
+          `${API_URL}/api/council/me`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }
+        );
+
+        /*
+         * 404 means the user has never applied.
+         * This is NOT an error for the profile page.
+         */
+        if (response.status === 404) {
+          setCouncilStatus(null);
+          return;
+        }
+
+        if (!response.ok) {
+          setCouncilStatus(null);
+          return;
+        }
+
+        const data = await response.json();
+
+        const status =
+          data?.member?.status ||
+          data?.status;
+
+        if (
+          status === "approved" ||
+          status === "pending" ||
+          status === "rejected"
+        ) {
+          setCouncilStatus(status);
+        } else {
+          setCouncilStatus(null);
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load Council status:",
+          error
+        );
+
+        setCouncilStatus(null);
+      } finally {
+        setCouncilLoading(false);
+      }
+    }
+
+    void loadCouncilStatus();
+  }, [user?.id]);
 
   function handleLogout() {
     localStorage.removeItem("herai_user");
     localStorage.removeItem("herai_session");
-    localStorage.removeItem("herai_access_token");
-    localStorage.removeItem("herai_refresh_token");
+    localStorage.removeItem(
+      "herai_access_token"
+    );
+    localStorage.removeItem(
+      "herai_refresh_token"
+    );
+    localStorage.removeItem("access_token");
 
     window.location.href = "/login";
   }
@@ -54,7 +177,11 @@ useEffect(() => {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#FBF7EC]">
         <div className="text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#B8860B]/20 border-t-[#B8860B]" />
+          <div
+            className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#B8860B]/20 border-t-[#B8860B]"
+            aria-hidden="true"
+          />
+
           <p className="mt-4 text-sm text-[#1A1A1A]/50">
             Loading...
           </p>
@@ -68,7 +195,6 @@ useEffect(() => {
       <main className="min-h-screen bg-[#FBF7EC] px-4 py-8 text-[#1A1A1A] sm:px-8">
         <div className="mx-auto max-w-5xl">
 
-          {/* HEADER */}
           <header className="flex items-center justify-between border-b border-[#1A1A1A]/10 pb-5">
             <Link
               href="/"
@@ -85,7 +211,6 @@ useEffect(() => {
             </Link>
           </header>
 
-          {/* NOT LOGGED IN */}
           <div className="flex min-h-[70vh] items-center justify-center">
             <div className="w-full max-w-md rounded-[2rem] border border-[#1A1A1A]/10 bg-white p-8 text-center shadow-xl shadow-[#1A1A1A]/5 sm:p-10">
 
@@ -127,6 +252,113 @@ useEffect(() => {
     .slice(0, 2)
     .toUpperCase();
 
+  /*
+   * Council button/content.
+   *
+   * IMPORTANT:
+   * We deliberately do NOT use /council for approved users.
+   * Approved users go directly to /council/dashboard.
+   */
+  function renderCouncilAction() {
+    if (councilLoading) {
+      return (
+        <div className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#1A1A1A]/10 bg-white px-6 text-sm font-semibold text-[#1A1A1A]/50">
+          Checking status...
+        </div>
+      );
+    }
+
+    /*
+     * APPROVED
+     */
+    if (councilStatus === "approved") {
+      return (
+        <Link
+          href="/council/dashboard"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#B8860B] px-6 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:bg-[#96700A]"
+        >
+          Council Dashboard →
+        </Link>
+      );
+    }
+
+    /*
+     * PENDING
+     *
+     * Do NOT show the application button.
+     * The user has already applied.
+     */
+    if (councilStatus === "pending") {
+      return (
+        <div className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#B8860B]/20 bg-[#B8860B]/10 px-6 text-sm font-semibold text-[#8A6500]">
+          Application pending
+        </div>
+      );
+    }
+
+    /*
+     * REJECTED
+     */
+    if (councilStatus === "rejected") {
+      return (
+        <Link
+          href="/council"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#B8860B]/30 bg-white px-6 text-sm font-semibold text-[#8A6500] transition hover:bg-[#B8860B]/5"
+        >
+          Apply again →
+        </Link>
+      );
+    }
+
+    /*
+     * NO APPLICATION
+     */
+    return (
+      <Link
+        href="/council"
+        className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#B8860B] px-6 text-sm font-semibold text-white shadow-md transition hover:bg-[#96700A]"
+      >
+        Apply to Council →
+      </Link>
+    );
+  }
+
+  function councilDescription() {
+    if (councilLoading) {
+      return "Checking your Council membership status...";
+    }
+
+    if (councilStatus === "approved") {
+      return "You are an approved HerAI Council member. Open the Council dashboard to review applications and manage Council rules.";
+    }
+
+    if (councilStatus === "pending") {
+      return "Your Council application is currently being reviewed. You will be able to access the Council dashboard once your membership is approved.";
+    }
+
+    if (councilStatus === "rejected") {
+      return "Your previous Council application was not approved. You can submit a new application if you would like to try again.";
+    }
+
+    return "Help review and shape the safety rules and guidance used by HerAI. Council membership is separate from your normal HerAI account.";
+  }
+
+  function councilTitle() {
+    if (councilStatus === "approved") {
+      return "HerAI Council";
+    }
+
+    if (councilStatus === "pending") {
+      return "Council application";
+    }
+
+    if (councilStatus === "rejected") {
+      return "Council membership";
+    }
+
+    return "Join the HerAI Council";
+  }
+
   return (
     <main className="min-h-screen bg-[#FBF7EC] px-4 py-8 text-[#1A1A1A] sm:px-8">
 
@@ -135,9 +367,12 @@ useEffect(() => {
         {/* HEADER */}
         <header className="flex items-center justify-between border-b border-[#1A1A1A]/10 pb-5">
 
-          <div className="text-lg font-semibold tracking-tight">
+          <Link
+            href="/"
+            className="text-lg font-semibold tracking-tight"
+          >
             HerAI Mashroo3
-          </div>
+          </Link>
 
           <button
             type="button"
@@ -257,37 +492,69 @@ useEffect(() => {
 
           </div>
 
-          {/* CHAT DESTINATION */}
-          <div className="mt-6 rounded-[2rem] border border-[#B8860B]/20 bg-[#B8860B]/[0.06] p-7 sm:p-9">
+          {/* COUNCIL DESTINATION */}
+          <div
+            className={[
+              "mt-6 rounded-[2rem] border p-7 sm:p-9",
+              councilStatus === "approved"
+                ? "border-green-200 bg-green-50/60"
+                : "border-[#B8860B]/20 bg-[#B8860B]/[0.06]",
+            ].join(" ")}
+          >
 
             <div className="flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
 
               <div className="flex items-start gap-5">
 
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#B8860B]/10 text-xl">
-                  💬
+                <div
+                  className={[
+                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl",
+                    councilStatus === "approved"
+                      ? "bg-green-100"
+                      : "bg-[#B8860B]/10",
+                  ].join(" ")}
+                >
+                  🏛️
                 </div>
 
                 <div>
-                  <h3 className="text-xl font-semibold">
-                    Ready to talk to HerAI?
-                  </h3>
+
+                  <div className="flex flex-wrap items-center gap-3">
+
+                    <h3 className="text-xl font-semibold">
+                      {councilTitle()}
+                    </h3>
+
+                    {councilStatus === "approved" && (
+                      <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                        Approved
+                      </span>
+                    )}
+
+                    {councilStatus === "pending" && (
+                      <span className="rounded-full bg-[#B8860B]/10 px-3 py-1 text-xs font-semibold text-[#8A6500]">
+                        Pending
+                      </span>
+                    )}
+
+                    {councilStatus === "rejected" && (
+                      <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                        Rejected
+                      </span>
+                    )}
+
+                  </div>
 
                   <p className="mt-2 max-w-xl text-sm leading-6 text-[#1A1A1A]/55">
-                    Ask questions about pricing, customers, suppliers,
-                    costs, growth, permits, risk, and your everyday business
-                    decisions.
+                    {councilDescription()}
                   </p>
+
                 </div>
 
               </div>
 
-              <Link
-                href="/chat"
-                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full bg-[#1A1A1A] px-6 text-sm font-semibold text-white transition hover:bg-[#333]"
-              >
-                Go to Chat
-              </Link>
+              {/* DYNAMIC COUNCIL ACTION */}
+              {renderCouncilAction()}
 
             </div>
 
