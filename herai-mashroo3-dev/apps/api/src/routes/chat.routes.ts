@@ -79,4 +79,38 @@ router.get('/history', authMiddleware, async (req: ServiceRequest, res: Response
   }
 })
 
+// GET /api/chat/conversations - fetch conversation list for sidebar
+router.get('/conversations', authMiddleware, async (req: ServiceRequest, res: Response) => {
+  try {
+    const { supabase } = req.services || {}
+    const user_id = req.user?.id
+
+    if (!user_id || !supabase) {
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('id, scrubbed_message, created_at, verdicts(id, final_response)')
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    const conversations = data.map((conv: any) => ({
+      id: conv.id,
+      title: conv.scrubbed_message || 'New Chat',
+      created_at: conv.created_at,
+      user_message: conv.scrubbed_message,
+      assistant_message: conv.verdicts?.[0]?.final_response || '',
+    }))
+
+    res.json({ conversations })
+  } catch (err: any) {
+    console.error('chat conversations error', err)
+    res.status(500).json({ error: String(err.message || err) })
+  }
+})
+
 export default router

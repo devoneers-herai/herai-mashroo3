@@ -58,6 +58,32 @@ export type ChatHistoryMessage = {
   content: string;
 };
 
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  created_at: string;
+  user_message: string;
+  assistant_message: string;
+};
+
+export async function getConversations(
+  accessToken: string
+): Promise<ConversationSummary[]> {
+  const response = await fetch(`${API_URL}/api/chat/conversations`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = await response.json();
+  return data.conversations || [];
+}
+
 export async function getChatHistory(
   accessToken: string
 ): Promise<ChatHistoryMessage[]> {

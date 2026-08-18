@@ -8,7 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { sendChatMessage, getChatHistory, ChatRequest, ChatResponse } from "@/lib/api";
+import {
+  sendChatMessage,
+  getConversations,
+  ChatRequest,
+  ChatResponse,
+  ConversationSummary,
+} from "@/lib/api";
 
 type Lang = "en" | "ar";
 type Country = "LB" | "EG";
@@ -42,6 +48,8 @@ const copy = {
     safety:
       "HerAI is designed to provide practical guidance, not professional legal, financial, or medical advice.",
     online: "Online",
+    recentChats: "Recent Chats",
+    noChats: "No previous chats yet",
     country: {
       LB: "Lebanon",
       EG: "Egypt",
@@ -68,6 +76,8 @@ const copy = {
     safety:
       "HerAI مصمم لتقديم إرشاد عملي، وليس بديلاً عن الاستشارة القانونية أو المالية أو الطبية المتخصصة.",
     online: "متصل",
+    recentChats: "المحادثات السابقة",
+    noChats: "لا توجد محادثات سابقة",
     country: {
       LB: "لبنان",
       EG: "مصر",
@@ -81,6 +91,8 @@ export default function ChatPage() {
   const [country, setCountry] = useState<Country>("EG");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -109,28 +121,54 @@ export default function ChatPage() {
 
   useEffect(() => {
     textareaRef.current?.focus();
-
-    // Load past conversation history if user is logged in
-    const token = localStorage.getItem("herai_access_token");
-    if (token) {
-      getChatHistory(token)
-        .then((history) => {
-          if (history && history.length > 0) {
-            setMessages(history);
-          }
-        })
-        .catch((err) => console.error("Failed to load chat history:", err));
-    }
+    loadConversations();
   }, []);
+
+  async function loadConversations() {
+    const token = localStorage.getItem("herai_access_token");
+    if (!token) return;
+
+    try {
+      const convList = await getConversations(token);
+      setConversations(convList);
+    } catch (err) {
+      console.error("Failed to load conversations:", err);
+    }
+  }
 
   function startNewChat() {
     setMessages([]);
+    setActiveConvId(null);
     setInput("");
     setIsTyping(false);
 
     setTimeout(() => {
       textareaRef.current?.focus();
     }, 0);
+  }
+
+  function selectConversation(conv: ConversationSummary) {
+    setActiveConvId(conv.id);
+    const msgs: Message[] = [];
+    const baseId = new Date(conv.created_at).getTime() || Date.now();
+
+    if (conv.user_message) {
+      msgs.push({
+        id: baseId,
+        role: "user",
+        content: conv.user_message,
+      });
+    }
+
+    if (conv.assistant_message) {
+      msgs.push({
+        id: baseId + 1,
+        role: "assistant",
+        content: conv.assistant_message,
+      });
+    }
+
+    setMessages(msgs);
   }
 
   async function sendMessage(value?: string) {
@@ -149,8 +187,9 @@ export default function ChatPage() {
     setIsTyping(true);
 
     try {
-      const token = localStorage.getItem("herai_access_token") || "dummy_token";
-      
+      const token =
+        localStorage.getItem("herai_access_token") || "dummy_token";
+
       const request: ChatRequest = {
         message: text,
         region_code: country,
@@ -166,6 +205,9 @@ export default function ChatPage() {
       };
 
       setMessages((current) => [...current, assistantMessage]);
+
+      // Refresh sidebar list after sending
+      loadConversations();
     } catch (err: any) {
       console.error("Chat error:", err);
       const errorMessage: Message = {
@@ -257,6 +299,14 @@ export default function ChatPage() {
               </button>
             </div>
 
+            {/* Profile Link */}
+            <a
+              href="/profile"
+              className="hidden h-9 items-center rounded-full border border-[#1A1A1A]/10 bg-white px-4 text-xs font-semibold transition hover:bg-[#1A1A1A]/[0.03] sm:inline-flex"
+            >
+              Profile
+            </a>
+
             {/* Back */}
             <a
               href="/"
@@ -269,61 +319,80 @@ export default function ChatPage() {
       </header>
 
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl">
-        {/* Desktop sidebar */}
-        <aside className="hidden w-64 shrink-0 border-e border-[#1A1A1A]/10 p-5 lg:flex lg:flex-col">
+        {/* Desktop ChatGPT-Style Sidebar */}
+        <aside className="hidden w-72 shrink-0 border-e border-[#1A1A1A]/10 p-5 lg:flex lg:flex-col">
           <button
             type="button"
             onClick={startNewChat}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#1A1A1A] px-4 text-sm font-semibold text-white transition hover:bg-[#2B2B2B]"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#1A1A1A] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2B2B2B]"
           >
             <span className="text-base">+</span>
             {t.newChat}
           </button>
 
-          <div className="mt-8">
-            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#1A1A1A]/35">
-              HerAI
+          {/* ChatGPT-style History List */}
+          <div className="mt-6 flex-1 overflow-y-auto">
+            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#1A1A1A]/40">
+              {t.recentChats}
             </p>
 
-            <div className="mt-3 rounded-2xl border border-[#1A1A1A]/10 bg-white p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#B8860B]/10 text-sm font-bold text-[#B8860B]">
-                  H
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold">HerAI</p>
-                  <p className="mt-0.5 text-[11px] text-[#1A1A1A]/45">
-                    {t.online}
-                  </p>
-                </div>
-              </div>
+            <div className="mt-2 space-y-1.5">
+              {conversations.length === 0 ? (
+                <p className="px-2 py-4 text-xs text-[#1A1A1A]/35">
+                  {t.noChats}
+                </p>
+              ) : (
+                conversations.map((conv) => {
+                  const isActive = activeConvId === conv.id;
+                  return (
+                    <button
+                      key={conv.id}
+                      type="button"
+                      onClick={() => selectConversation(conv)}
+                      className={`group flex w-full flex-col rounded-xl px-3 py-2.5 text-start transition ${
+                        isActive
+                          ? "bg-[#B8860B]/15 text-[#B8860B] font-semibold"
+                          : "text-[#1A1A1A]/75 hover:bg-[#1A1A1A]/5 hover:text-[#1A1A1A]"
+                      }`}
+                    >
+                      <span className="truncate text-xs font-medium">
+                        {conv.title}
+                      </span>
+                      <span className="mt-0.5 text-[10px] text-[#1A1A1A]/35">
+                        {new Date(conv.created_at).toLocaleDateString()}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 
-          <div className="mt-auto rounded-2xl border border-[#B8860B]/20 bg-[#B8860B]/[0.06] p-4">
-            <p className="text-xs font-semibold text-[#96700A]">
-              Pilot program
-            </p>
+          <div className="mt-4 border-t border-[#1A1A1A]/10 pt-4">
+            <div className="rounded-2xl border border-[#B8860B]/20 bg-[#B8860B]/[0.06] p-4">
+              <p className="text-xs font-semibold text-[#96700A]">
+                Pilot program
+              </p>
 
-            <p className="mt-2 text-xs leading-5 text-[#1A1A1A]/55">
-              Bring HerAI to your organization or cohort.
-            </p>
+              <p className="mt-1.5 text-xs leading-5 text-[#1A1A1A]/55">
+                Bring HerAI to your organization or cohort.
+              </p>
 
-            <a
-              href={pilotFormUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex text-xs font-semibold text-[#96700A] hover:underline"
-            >
-              Run a pilot →
-            </a>
+              <a
+                href={pilotFormUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2.5 inline-flex text-xs font-semibold text-[#96700A] hover:underline"
+              >
+                Run a pilot →
+              </a>
+            </div>
           </div>
         </aside>
 
-        {/* Chat */}
+        {/* Chat Area */}
         <section className="flex min-w-0 flex-1 flex-col">
-          {/* Mobile new chat */}
+          {/* Mobile history / new chat bar */}
           <div className="flex items-center justify-between border-b border-[#1A1A1A]/10 px-4 py-3 lg:hidden">
             <span className="text-xs font-medium text-[#1A1A1A]/45">
               HerAI · {t.country[country]}
