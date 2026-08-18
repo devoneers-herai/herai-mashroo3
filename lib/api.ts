@@ -52,6 +52,30 @@ export async function sendChatMessage(
   return response.json();
 }
 
+export type ChatHistoryMessage = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+};
+
+export async function getChatHistory(
+  accessToken: string
+): Promise<ChatHistoryMessage[]> {
+  const response = await fetch(`${API_URL}/api/chat/history`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = await response.json();
+  return data.messages || [];
+}
+
 export type CouncilMember = {
   id: string;
   user_id: string;

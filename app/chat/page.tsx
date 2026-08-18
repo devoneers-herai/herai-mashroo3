@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { sendChatMessage, ChatRequest, ChatResponse } from "@/lib/api";
+import { sendChatMessage, getChatHistory, ChatRequest, ChatResponse } from "@/lib/api";
 
 type Lang = "en" | "ar";
 type Country = "LB" | "EG";
@@ -109,6 +109,18 @@ export default function ChatPage() {
 
   useEffect(() => {
     textareaRef.current?.focus();
+
+    // Load past conversation history if user is logged in
+    const token = localStorage.getItem("herai_access_token");
+    if (token) {
+      getChatHistory(token)
+        .then((history) => {
+          if (history && history.length > 0) {
+            setMessages(history);
+          }
+        })
+        .catch((err) => console.error("Failed to load chat history:", err));
+    }
   }, []);
 
   function startNewChat() {
