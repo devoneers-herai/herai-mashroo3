@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { sendChatMessage, ChatRequest, ChatResponse } from "@/lib/api";
 
 type Lang = "en" | "ar";
 type Country = "LB" | "EG";
@@ -34,14 +33,15 @@ const copy = {
     send: "Send",
     welcome:
       "Hi! I’m HerAI. Tell me what you’re working on, and I’ll help you think through the next step.",
-    error: "Something went wrong. Please check your connection and try again.",
+    demoReply:
+      "Absolutely. For now, I’m a UI-only preview, so the real HerAI intelligence isn’t connected yet. Your question was received successfully.",
     pricing: "How should I price my product?",
     customers: "How can I find more customers?",
     costs: "How do I understand my costs?",
     growth: "How can I grow my business?",
     safety:
       "HerAI is designed to provide practical guidance, not professional legal, financial, or medical advice.",
-    online: "Online",
+    online: "Preview mode",
     country: {
       LB: "Lebanon",
       EG: "Egypt",
@@ -60,14 +60,15 @@ const copy = {
     send: "إرسال",
     welcome:
       "أهلاً! أنا HerAI. احكيلي عن شغلك أو المشروع اللي بتشتغلي عليه، ونفكر سوا في الخطوة الجاية.",
-    error: "حدث خطأ ما. يرجى التحقق من اتصالك والمحاولة مرة أخرى.",
+    demoReply:
+      "أكيد. حالياً دي مجرد معاينة للواجهة، ولسه ذكاء HerAI الحقيقي مش متوصل بالـ backend. سؤالك اتسجل بنجاح.",
     pricing: "أسعّر المنتج بتاعي بكام؟",
     customers: "أوصل لعملاء أكتر إزاي؟",
     costs: "أفهم مصاريفي وتكلفتي إزاي؟",
     growth: "أكبر مشروعي إزاي؟",
     safety:
       "HerAI مصمم لتقديم إرشاد عملي، وليس بديلاً عن الاستشارة القانونية أو المالية أو الطبية المتخصصة.",
-    online: "متصل",
+    online: "وضع المعاينة",
     country: {
       LB: "لبنان",
       EG: "مصر",
@@ -98,6 +99,13 @@ export default function ChatPage() {
     [t]
   );
 
+  /*
+   * Keep the document direction correct for the overall UI.
+   *
+   * Chat message rows are explicitly LTR below. This is intentional:
+   * the user bubble must remain physically on the RIGHT and HerAI's
+   * bubble must remain physically on the LEFT in both languages.
+   */
   useEffect(() => {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
@@ -121,7 +129,7 @@ export default function ChatPage() {
     }, 0);
   }
 
-  async function sendMessage(value?: string) {
+  function sendMessage(value?: string) {
     const text = (value ?? input).trim();
 
     if (!text || isTyping) return;
@@ -136,35 +144,16 @@ export default function ChatPage() {
     setInput("");
     setIsTyping(true);
 
-    try {
-      const token = localStorage.getItem("herai_access_token") || "dummy_token";
-      
-      const request: ChatRequest = {
-        message: text,
-        region_code: country,
-        language: lang,
-      };
-
-      const response: ChatResponse = await sendChatMessage(request, token);
-
+    window.setTimeout(() => {
       const assistantMessage: Message = {
         id: Date.now() + 1,
         role: "assistant",
-        content: response.response,
+        content: t.demoReply,
       };
 
       setMessages((current) => [...current, assistantMessage]);
-    } catch (err: any) {
-      console.error("Chat error:", err);
-      const errorMessage: Message = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: t.error,
-      };
-      setMessages((current) => [...current, errorMessage]);
-    } finally {
       setIsTyping(false);
-    }
+    }, 850);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -222,11 +211,10 @@ export default function ChatPage() {
                 type="button"
                 onClick={() => setLang("en")}
                 aria-pressed={lang === "en"}
-                className={`px-3 py-1.5 transition ${
-                  lang === "en"
+                className={`px-3 py-1.5 transition ${lang === "en"
                     ? "bg-[#1A1A1A] text-white"
                     : "text-[#1A1A1A]/55 hover:text-[#1A1A1A]"
-                }`}
+                  }`}
               >
                 EN
               </button>
@@ -235,11 +223,10 @@ export default function ChatPage() {
                 type="button"
                 onClick={() => setLang("ar")}
                 aria-pressed={lang === "ar"}
-                className={`px-3 py-1.5 transition ${
-                  lang === "ar"
+                className={`px-3 py-1.5 transition ${lang === "ar"
                     ? "bg-[#1A1A1A] text-white"
                     : "text-[#1A1A1A]/55 hover:text-[#1A1A1A]"
-                }`}
+                  }`}
               >
                 عربي
               </button>
@@ -369,14 +356,21 @@ export default function ChatPage() {
               <div className="flex-1 overflow-y-auto px-4 py-8 sm:px-8">
                 <div className="mx-auto max-w-3xl space-y-7">
                   {messages.map((message) => (
+                    /*
+                     * Message ROW is always LTR.
+                     * This controls physical placement only:
+                     * user = right, HerAI = left.
+                     *
+                     * The actual message bubbles below get their own
+                     * direction so Arabic text itself still renders RTL.
+                     */
                     <div
                       key={message.id}
                       dir="ltr"
-                      className={`flex ${
-                        message.role === "user"
+                      className={`flex ${message.role === "user"
                           ? "justify-end"
                           : "justify-start"
-                      }`}
+                        }`}
                     >
                       {message.role === "assistant" ? (
                         <div className="flex max-w-[88%] items-start gap-3 sm:max-w-[80%]">
@@ -387,11 +381,10 @@ export default function ChatPage() {
                           <div>
                             <div
                               dir={lang === "ar" ? "rtl" : "ltr"}
-                              className={`rounded-2xl border border-[#1A1A1A]/10 bg-white px-4 py-3.5 text-sm leading-7 shadow-sm whitespace-pre-wrap ${
-                                lang === "ar"
+                              className={`rounded-2xl border border-[#1A1A1A]/10 bg-white px-4 py-3.5 text-sm leading-7 shadow-sm ${lang === "ar"
                                   ? "rounded-bl-sm text-right"
                                   : "rounded-bl-sm text-left"
-                              }`}
+                                }`}
                             >
                               {message.content}
                             </div>
@@ -407,11 +400,10 @@ export default function ChatPage() {
                       ) : (
                         <div
                           dir={lang === "ar" ? "rtl" : "ltr"}
-                          className={`max-w-[82%] rounded-2xl bg-[#1A1A1A] px-4 py-3.5 text-sm leading-7 text-white shadow-sm sm:max-w-[72%] whitespace-pre-wrap ${
-                            lang === "ar"
+                          className={`max-w-[82%] rounded-2xl bg-[#1A1A1A] px-4 py-3.5 text-sm leading-7 text-white shadow-sm sm:max-w-[72%] ${lang === "ar"
                               ? "rounded-br-sm text-right"
                               : "rounded-br-sm text-left"
-                          }`}
+                            }`}
                         >
                           {message.content}
                         </div>
@@ -448,10 +440,17 @@ export default function ChatPage() {
             <div className="border-t border-[#1A1A1A]/10 bg-[#FBF7EC]/95 px-4 pb-4 pt-4 backdrop-blur-xl sm:px-8 sm:pb-6">
               <div className="mx-auto max-w-3xl">
                 <form onSubmit={handleSubmit}>
+                  {/* IMPORTANT:
+                      The composer itself has an explicit direction.
+                      This prevents RTL from changing the physical
+                      positioning of the send-button/padding logic.
+                  */}
                   <div
                     dir={lang === "ar" ? "rtl" : "ltr"}
                     className="relative rounded-3xl border border-[#1A1A1A]/15 bg-white p-2 shadow-lg shadow-[#1A1A1A]/5 focus-within:border-[#B8860B]/50"
                   >
+                    {/* Reserve space for the send button on the same side
+                        as its physical position for the active language. */}
                     <textarea
                       ref={textareaRef}
                       value={input}
@@ -461,20 +460,23 @@ export default function ChatPage() {
                       dir={lang === "ar" ? "rtl" : "ltr"}
                       placeholder={t.placeholder}
                       disabled={isTyping}
-                      className={`max-h-40 min-h-12 w-full resize-none bg-transparent py-3 text-sm leading-6 outline-none placeholder:text-[#1A1A1A]/30 disabled:cursor-not-allowed ${
-                        lang === "ar"
+                      className={`max-h-40 min-h-12 w-full resize-none bg-transparent py-3 text-sm leading-6 outline-none placeholder:text-[#1A1A1A]/30 disabled:cursor-not-allowed ${lang === "ar"
                           ? "pl-14 pr-3 text-right"
                           : "pl-3 pr-14 text-left"
-                      }`}
+                        }`}
                     />
 
+                    {/* Keep the send button on the natural side for each language.
+                        English (LTR) -> right.
+                        Arabic (RTL) -> left.
+                        The textarea reserves space on the same physical side,
+                        so the placeholder/text can never sit underneath it. */}
                     <button
                       type="submit"
                       disabled={!input.trim() || isTyping}
                       aria-label={t.send}
-                      className={`absolute bottom-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#B8860B] text-white transition hover:bg-[#96700A] disabled:cursor-not-allowed disabled:bg-[#B8860B]/25 ${
-                        lang === "ar" ? "left-2.5" : "right-2.5"
-                      }`}
+                      className={`absolute bottom-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#B8860B] text-white transition hover:bg-[#96700A] disabled:cursor-not-allowed disabled:bg-[#B8860B]/25 ${lang === "ar" ? "left-2.5" : "right-2.5"
+                        }`}
                     >
                       <span className="text-sm">↑</span>
                     </button>

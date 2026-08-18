@@ -8,7 +8,7 @@ const router = Router()
 
 router.post('/', authMiddleware, async (req: ServiceRequest, res: Response, next: NextFunction) => {
   try {
-    const { message, region_code, domain_scope, persona } = req.body
+    const { message, region_code, domain_scope, persona, language } = req.body
     const { supabase, OPENAI_API_KEY } = req.services || {}
     const user_id = req.user?.id
 
@@ -17,7 +17,7 @@ router.post('/', authMiddleware, async (req: ServiceRequest, res: Response, next
       return
     }
 
-    const output = await handleChatLogic({ message, region_code, domain_scope, persona, user_id }, {
+    const output = await handleChatLogic({ message, region_code, domain_scope, persona, user_id, language }, {
       supabase,
       openaiKey: OPENAI_API_KEY as string,
     })

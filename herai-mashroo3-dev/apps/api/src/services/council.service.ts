@@ -16,6 +16,11 @@ export async function registerCouncilMember(
   user_id: string,
   supabase: SupabaseClient
 ): Promise<CouncilMemberResponse> {
+  const existing = await getCouncilMemberStatus(user_id, supabase)
+  if (existing) {
+    return existing
+  }
+
   const { data, error } = await supabase
     .from('council_members')
     .insert([{ user_id, status: 'pending' }])
@@ -109,4 +114,31 @@ export async function isApprovedCouncilMember(
   return member !== null && member.status === 'approved'
 }
 
-export default { registerCouncilMember, getCouncilMemberStatus, updateCouncilMemberStatus, isApprovedCouncilMember }
+/**
+ * Get all council members, optionally filtered by status.
+ */
+export async function getAllCouncilMembers(
+  supabase: SupabaseClient,
+  statusFilter?: 'pending' | 'approved' | 'rejected'
+): Promise<CouncilMemberResponse[]> {
+  let query = supabase.from('council_members').select('*')
+  
+  if (statusFilter) {
+    query = query.eq('status', statusFilter)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(`Failed to fetch council members: ${error.message}`)
+  }
+
+  return data.map((row: any) => ({
+    id: row.id,
+    user_id: row.user_id,
+    status: row.status,
+    created_at: row.created_at,
+  }))
+}
+
+export default { registerCouncilMember, getCouncilMemberStatus, updateCouncilMemberStatus, isApprovedCouncilMember, getAllCouncilMembers }

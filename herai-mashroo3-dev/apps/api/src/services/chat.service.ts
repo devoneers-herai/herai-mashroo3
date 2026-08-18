@@ -2,7 +2,7 @@ import { generateDraft, evaluateSafety } from './ai.service'
 import { scrub } from './scrub.service'
 import { getRegionConfig } from './region.service'
 
-type ChatInput = { message: string; region_code?: string; persona?: string; domain_scope?: string; user_id: string }
+type ChatInput = { message: string; region_code?: string; persona?: string; domain_scope?: string; user_id: string; language?: string }
 
 export async function handleChatLogic(input: ChatInput, deps: { supabase: any; openaiKey: string }) {
   const { supabase, openaiKey } = deps
@@ -22,8 +22,8 @@ export async function handleChatLogic(input: ChatInput, deps: { supabase: any; o
   
   // Wrap AI calls in try/catch to ensure errors trigger a BLOCK
   try {
-    // 3. Generate initial draft
-    let draft = await generateDraft({ message: scrubbed, region: regionCode, persona: input.persona, domain: domainScope }, openaiKey)
+    // 3. Generate initial draft (with council rules injected)
+    let draft = await generateDraft({ message: scrubbed, region: regionCode, persona: input.persona, domain: domainScope, language: input.language, supabase }, openaiKey)
     
     // 4. Safety evaluation (initial)
     verdict = await evaluateSafety(draft, openaiKey)
@@ -38,6 +38,8 @@ export async function handleChatLogic(input: ChatInput, deps: { supabase: any; o
         region: regionCode, 
         persona: input.persona, 
         domain: domainScope,
+        language: input.language,
+        supabase,
         adjustmentInstruction: 'Ensure the response completely avoids any biased or high-risk language.' 
       }, openaiKey)
       

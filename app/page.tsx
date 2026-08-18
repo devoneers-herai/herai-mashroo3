@@ -502,7 +502,7 @@ export default function Home() {
 
             {/* PILOT CTA */}
             <a
-              href={PILOT_FORM_URL}
+              href="/login"
               target="_blank"
               rel="noopener noreferrer"
               className="hidden h-9 items-center justify-center rounded-full bg-[#B8860B] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#96700A] sm:inline-flex"
@@ -545,7 +545,7 @@ export default function Home() {
               </a>
 
               <a
-                href={PILOT_FORM_URL}
+                href="/login"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#1A1A1A]/15 bg-white px-7 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1A1A1A]/[0.03]"
@@ -820,7 +820,7 @@ export default function Home() {
                 </div>
 
                 <a
-                  href={PILOT_FORM_URL}
+                  href="/login"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#B8860B] px-7 text-sm font-semibold text-white transition hover:bg-[#D09B17]"

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import authMiddleware from '../middleware/auth.middleware'
 import councilMiddleware from '../middleware/council.middleware'
-import { registerCouncilMember, getCouncilMemberStatus, updateCouncilMemberStatus } from '../services/council.service'
+import { registerCouncilMember, getCouncilMemberStatus, updateCouncilMemberStatus, getAllCouncilMembers } from '../services/council.service'
 
 type ServiceRequest = Request & { services?: { supabase?: any }; user?: { id: string; email: string } }
 
@@ -31,6 +31,20 @@ router.get('/members/:user_id', authMiddleware, async (req: ServiceRequest, res:
 
     const status = await getCouncilMemberStatus(user_id, supabase)
     res.json({ status })
+  } catch (err: any) {
+    res.status(500).json({ error: String(err.message || err) })
+  }
+})
+
+// Get all council members — requires caller to be an approved council member
+router.get('/members', authMiddleware, councilMiddleware, async (req: ServiceRequest, res: Response) => {
+  try {
+    const { supabase } = req.services || {}
+    const { status } = req.query
+    if (!supabase) return res.status(500).json({ error: 'Missing deps' })
+
+    const members = await getAllCouncilMembers(supabase, status as any)
+    res.json(members)
   } catch (err: any) {
     res.status(500).json({ error: String(err.message || err) })
   }
@@ -73,23 +87,55 @@ router.post('/rules', authMiddleware, councilMiddleware, async (req: ServiceRequ
       return res.status(500).json({ error: 'Supabase client not available' })
     }
 
-    const payload = req.body
-    const userId = req.user?.id
-
-    payload.created_by = userId
-    // Generate rule_id if missing
-    if (!payload.rule_id) {
-      payload.rule_id = 'rule-' + Math.random().toString(36).substring(2, 9)
+    const { title, rule_text, domain, region_code } = req.body
+    if (!title || !rule_text) {
+      return res.status(400).json({ error: 'title and rule_text are required' })
     }
 
-    const { data, error } = await supabase.from('rules').insert([payload]).select().single()
-    if (error) throw error
+    const { data, error } = await supabase.from('council_rules').insert([{
+      title,
+      rule_text,
+      domain: domain || null,
+      region_code: region_code || null,
+      created_by: req.user?.id,
+      is_active: true,
+    }]).select().single()
 
-    res.status(201).json({ data })
+    if (error) throw error
+    res.status(201).json(data)
   } catch (err: any) {
     console.error('council.rules error', err)
     res.status(500).json({ error: String(err.message || err) })
   }
 })
 
+// List all council rules
+router.get('/rules', authMiddleware, councilMiddleware, async (req: ServiceRequest, res: Response) => {
+  try {
+    const { supabase } = req.services || {}
+    if (!supabase) return res.status(500).json({ error: 'Missing deps' })
+
+    const { data, error } = await supabase.from('council_rules').select('*').order('created_at', { ascending: false })
+    if (error) throw error
+    res.json(data)
+  } catch (err: any) {
+    res.status(500).json({ error: String(err.message || err) })
+  }
+})
+
+// Delete a council rule
+router.delete('/rules/:id', authMiddleware, councilMiddleware, async (req: ServiceRequest, res: Response) => {
+  try {
+    const { supabase } = req.services || {}
+    if (!supabase) return res.status(500).json({ error: 'Missing deps' })
+
+    const { error } = await supabase.from('council_rules').delete().eq('id', req.params.id)
+    if (error) throw error
+    res.json({ success: true })
+  } catch (err: any) {
+    res.status(500).json({ error: String(err.message || err) })
+  }
+})
+
 export default router
+
