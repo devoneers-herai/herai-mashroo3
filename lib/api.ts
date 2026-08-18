@@ -84,6 +84,19 @@ export async function getConversations(
   return data.conversations || [];
 }
 
+export async function deleteConversation(
+  id: string,
+  accessToken: string
+): Promise<boolean> {
+  const response = await fetch(`${API_URL}/api/chat/conversations/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  return response.ok;
+}
+
 export async function getChatHistory(
   accessToken: string
 ): Promise<ChatHistoryMessage[]> {

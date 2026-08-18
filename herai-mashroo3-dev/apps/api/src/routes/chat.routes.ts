@@ -113,4 +113,35 @@ router.get('/conversations', authMiddleware, async (req: ServiceRequest, res: Re
   }
 })
 
+// DELETE /api/chat/conversations/:id - delete a conversation + its verdicts
+router.delete('/conversations/:id', authMiddleware, async (req: ServiceRequest, res: Response) => {
+  try {
+    const { supabase } = req.services || {}
+    const user_id = req.user?.id
+    const { id } = req.params
+
+    if (!user_id || !supabase) {
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
+
+    // Delete verdicts first (FK constraint)
+    await supabase.from('verdicts').delete().eq('conversation_id', id)
+
+    // Delete the conversation (only if it belongs to this user)
+    const { error } = await supabase
+      .from('conversations')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user_id)
+
+    if (error) throw error
+
+    res.json({ success: true })
+  } catch (err: any) {
+    console.error('chat delete error', err)
+    res.status(500).json({ error: String(err.message || err) })
+  }
+})
+
 export default router

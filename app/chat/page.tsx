@@ -11,6 +11,7 @@ import {
 import {
   sendChatMessage,
   getConversations,
+  deleteConversation,
   ChatRequest,
   ChatResponse,
   ConversationSummary,
@@ -133,6 +134,20 @@ export default function ChatPage() {
       setConversations(convList);
     } catch (err) {
       console.error("Failed to load conversations:", err);
+    }
+  }
+
+  async function handleDeleteConversation(e: React.MouseEvent, id: string) {
+    e.stopPropagation();
+    const token = localStorage.getItem("herai_access_token");
+    if (!token) return;
+    const ok = await deleteConversation(id, token);
+    if (ok) {
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (activeConvId === id) {
+        setActiveConvId(null);
+        setMessages([]);
+      }
     }
   }
 
@@ -345,23 +360,39 @@ export default function ChatPage() {
                 conversations.map((conv) => {
                   const isActive = activeConvId === conv.id;
                   return (
-                    <button
+                    <div
                       key={conv.id}
-                      type="button"
-                      onClick={() => selectConversation(conv)}
-                      className={`group flex w-full flex-col rounded-xl px-3 py-2.5 text-start transition ${
+                      className={`group relative flex w-full items-center rounded-xl transition ${
                         isActive
-                          ? "bg-[#B8860B]/15 text-[#B8860B] font-semibold"
-                          : "text-[#1A1A1A]/75 hover:bg-[#1A1A1A]/5 hover:text-[#1A1A1A]"
+                          ? "bg-[#B8860B]/15"
+                          : "hover:bg-[#1A1A1A]/5"
                       }`}
                     >
-                      <span className="truncate text-xs font-medium">
-                        {conv.title}
-                      </span>
-                      <span className="mt-0.5 text-[10px] text-[#1A1A1A]/35">
-                        {new Date(conv.created_at).toLocaleDateString()}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => selectConversation(conv)}
+                        className={`flex flex-1 flex-col px-3 py-2.5 text-start ${
+                          isActive ? "text-[#B8860B] font-semibold" : "text-[#1A1A1A]/75"
+                        }`}
+                      >
+                        <span className="truncate text-xs font-medium pr-6">
+                          {conv.title}
+                        </span>
+                        <span className="mt-0.5 text-[10px] text-[#1A1A1A]/35">
+                          {new Date(conv.created_at).toLocaleDateString()}
+                        </span>
+                      </button>
+
+                      {/* Delete button — visible on hover */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteConversation(e, conv.id)}
+                        title="Delete chat"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 hidden h-6 w-6 items-center justify-center rounded-md text-[#1A1A1A]/30 transition hover:bg-red-100 hover:text-red-600 group-hover:flex"
+                      >
+                        🗑
+                      </button>
+                    </div>
                   );
                 })
               )}
