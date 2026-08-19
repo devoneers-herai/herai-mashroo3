@@ -211,11 +211,10 @@ export default function ChatPage() {
                 type="button"
                 onClick={() => setLang("en")}
                 aria-pressed={lang === "en"}
-                className={`px-3 py-1.5 transition ${
-                  lang === "en"
+                className={`px-3 py-1.5 transition ${lang === "en"
                     ? "bg-[#1A1A1A] text-white"
                     : "text-[#1A1A1A]/55 hover:text-[#1A1A1A]"
-                }`}
+                  }`}
               >
                 EN
               </button>
@@ -224,11 +223,10 @@ export default function ChatPage() {
                 type="button"
                 onClick={() => setLang("ar")}
                 aria-pressed={lang === "ar"}
-                className={`px-3 py-1.5 transition ${
-                  lang === "ar"
+                className={`px-3 py-1.5 transition ${lang === "ar"
                     ? "bg-[#1A1A1A] text-white"
                     : "text-[#1A1A1A]/55 hover:text-[#1A1A1A]"
-                }`}
+                  }`}
               >
                 عربي
               </button>
@@ -288,7 +286,7 @@ export default function ChatPage() {
             </p>
 
             <a
-              href="/register"
+              href= "/login"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 inline-flex text-xs font-semibold text-[#96700A] hover:underline"
@@ -369,11 +367,10 @@ export default function ChatPage() {
                     <div
                       key={message.id}
                       dir="ltr"
-                      className={`flex ${
-                        message.role === "user"
+                      className={`flex ${message.role === "user"
                           ? "justify-end"
                           : "justify-start"
-                      }`}
+                        }`}
                     >
                       {message.role === "assistant" ? (
                         <div className="flex max-w-[88%] items-start gap-3 sm:max-w-[80%]">
@@ -384,11 +381,10 @@ export default function ChatPage() {
                           <div>
                             <div
                               dir={lang === "ar" ? "rtl" : "ltr"}
-                              className={`rounded-2xl border border-[#1A1A1A]/10 bg-white px-4 py-3.5 text-sm leading-7 shadow-sm ${
-                                lang === "ar"
+                              className={`rounded-2xl border border-[#1A1A1A]/10 bg-white px-4 py-3.5 text-sm leading-7 shadow-sm ${lang === "ar"
                                   ? "rounded-bl-sm text-right"
                                   : "rounded-bl-sm text-left"
-                              }`}
+                                }`}
                             >
                               {message.content}
                             </div>
@@ -404,11 +400,10 @@ export default function ChatPage() {
                       ) : (
                         <div
                           dir={lang === "ar" ? "rtl" : "ltr"}
-                          className={`max-w-[82%] rounded-2xl bg-[#1A1A1A] px-4 py-3.5 text-sm leading-7 text-white shadow-sm sm:max-w-[72%] ${
-                            lang === "ar"
+                          className={`max-w-[82%] rounded-2xl bg-[#1A1A1A] px-4 py-3.5 text-sm leading-7 text-white shadow-sm sm:max-w-[72%] ${lang === "ar"
                               ? "rounded-br-sm text-right"
                               : "rounded-br-sm text-left"
-                          }`}
+                            }`}
                         >
                           {message.content}
                         </div>
@@ -465,11 +460,10 @@ export default function ChatPage() {
                       dir={lang === "ar" ? "rtl" : "ltr"}
                       placeholder={t.placeholder}
                       disabled={isTyping}
-                      className={`max-h-40 min-h-12 w-full resize-none bg-transparent py-3 text-sm leading-6 outline-none placeholder:text-[#1A1A1A]/30 disabled:cursor-not-allowed ${
-                        lang === "ar"
+                      className={`max-h-40 min-h-12 w-full resize-none bg-transparent py-3 text-sm leading-6 outline-none placeholder:text-[#1A1A1A]/30 disabled:cursor-not-allowed ${lang === "ar"
                           ? "pl-14 pr-3 text-right"
                           : "pl-3 pr-14 text-left"
-                      }`}
+                        }`}
                     />
 
                     {/* Keep the send button on the natural side for each language.
@@ -481,9 +475,8 @@ export default function ChatPage() {
                       type="submit"
                       disabled={!input.trim() || isTyping}
                       aria-label={t.send}
-                      className={`absolute bottom-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#B8860B] text-white transition hover:bg-[#96700A] disabled:cursor-not-allowed disabled:bg-[#B8860B]/25 ${
-                        lang === "ar" ? "left-2.5" : "right-2.5"
-                      }`}
+                      className={`absolute bottom-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#B8860B] text-white transition hover:bg-[#96700A] disabled:cursor-not-allowed disabled:bg-[#B8860B]/25 ${lang === "ar" ? "left-2.5" : "right-2.5"
+                        }`}
                     >
                       <span className="text-sm">↑</span>
                     </button>

@@ -8,15 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
-import Link from "next/link";
 import {
   sendChatMessage,
   getConversations,
-  getConversationMessages,
   deleteConversation,
   ChatRequest,
   ChatResponse,
-  Conversation,
+  ConversationSummary,
 } from "@/lib/api";
 
 type Lang = "en" | "ar";
@@ -31,14 +29,15 @@ type Message = {
 const copy = {
   en: {
     brand: "HerAI Mashroo3",
-    newChat: "New chat",
     profile: "Profile",
-    logout: "Log out",
+    newChat: "New chat",
     title: "How can I help with your business?",
     subtitle:
       "Ask about pricing, customers, suppliers, costs, permits, growth, or risks.",
     placeholder: "Ask HerAI a question...",
     send: "Send",
+    welcome:
+      "Hi! I’m HerAI. Tell me what you’re working on, and I’ll help you think through the next step.",
     error: "Something went wrong. Please check your connection and try again.",
     pricing: "How should I price my product?",
     customers: "How can I find more customers?",
@@ -47,36 +46,32 @@ const copy = {
     safety:
       "HerAI is designed to provide practical guidance, not professional legal, financial, or medical advice.",
     online: "Online",
-    history: "Chat history",
-    loadingHistory: "Loading chats...",
-    noHistory: "No previous conversations.",
-    newConversation: "New conversation",
-    delete: "Delete conversation",
-    deleteTitle: "Delete this conversation?",
-    deleteDescription:
-      "This conversation and its messages will be permanently deleted. This action cannot be undone.",
-    cancel: "Cancel",
-    deleteConfirm: "Delete",
-    deleting: "Deleting...",
-    deleteError:
-      "Failed to delete the conversation. Please try again.",
+    recentChats: "Recent Chats",
+    noChats: "No previous chats yet",
     country: {
       LB: "Lebanon",
       EG: "Egypt",
     },
     language: "Language",
+    deleteTitle: "Delete this chat?",
+    deleteMessage:
+      "Are you sure you want to delete this conversation? This action cannot be undone.",
+    cancel: "Cancel",
+    delete: "Delete",
+    deleting: "Deleting...",
   },
 
   ar: {
     brand: "HerAI Mashroo3",
-    newChat: "محادثة جديدة",
     profile: "الملف الشخصي",
-    logout: "تسجيل الخروج",
+    newChat: "محادثة جديدة",
     title: "إزاي ممكن أساعدك في شغلك؟",
     subtitle:
       "اسألي عن التسعير، العملاء، الموردين، المصاريف، التراخيص، النمو أو المخاطر.",
     placeholder: "اكتبي سؤالك لـ HerAI...",
     send: "إرسال",
+    welcome:
+      "أهلاً! أنا HerAI. احكيلي عن شغلك أو المشروع اللي بتشتغلي عليه، ونفكر سوا في الخطوة الجاية.",
     error: "حدث خطأ ما. يرجى التحقق من اتصالك والمحاولة مرة أخرى.",
     pricing: "أسعّر المنتج بتاعي بكام؟",
     customers: "أوصل لعملاء أكتر إزاي؟",
@@ -85,49 +80,37 @@ const copy = {
     safety:
       "HerAI مصمم لتقديم إرشاد عملي، وليس بديلاً عن الاستشارة القانونية أو المالية أو الطبية المتخصصة.",
     online: "متصل",
-    history: "المحادثات السابقة",
-    loadingHistory: "جاري تحميل المحادثات...",
-    noHistory: "لا توجد محادثات سابقة.",
-    newConversation: "محادثة جديدة",
-    delete: "حذف المحادثة",
-    deleteTitle: "حذف هذه المحادثة؟",
-    deleteDescription:
-      "سيتم حذف هذه المحادثة ورسائلها نهائيًا. لا يمكن التراجع عن هذا الإجراء.",
-    cancel: "إلغاء",
-    deleteConfirm: "حذف",
-    deleting: "جاري الحذف...",
-    deleteError:
-      "تعذر حذف المحادثة. يرجى المحاولة مرة أخرى.",
+    recentChats: "المحادثات السابقة",
+    noChats: "لا توجد محادثات سابقة",
     country: {
       LB: "لبنان",
       EG: "مصر",
     },
     language: "اللغة",
+    deleteTitle: "حذف المحادثة؟",
+    deleteMessage:
+      "هل أنتِ متأكدة من حذف هذه المحادثة؟ لا يمكن التراجع عن هذا الإجراء.",
+    cancel: "إلغاء",
+    delete: "حذف",
+    deleting: "جاري الحذف...",
   },
 } as const;
 
 export default function ChatPage() {
   const [lang, setLang] = useState<Lang>("ar");
   const [country, setCountry] = useState<Country>("EG");
-
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-
+  const [conversations, setConversations] = useState<
+    ConversationSummary[]
+  >([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
 
-  const [conversationId, setConversationId] = useState<
-    string | undefined
-  >();
-
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // Delete modal state
-  const [conversationToDelete, setConversationToDelete] =
-    useState<Conversation | null>(null);
-
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(
+    null
+  );
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -136,22 +119,10 @@ export default function ChatPage() {
 
   const suggestions = useMemo(
     () => [
-      {
-        label: t.pricing,
-        value: t.pricing,
-      },
-      {
-        label: t.customers,
-        value: t.customers,
-      },
-      {
-        label: t.costs,
-        value: t.costs,
-      },
-      {
-        label: t.growth,
-        value: t.growth,
-      },
+      { label: t.pricing, value: t.pricing },
+      { label: t.customers, value: t.customers },
+      { label: t.costs, value: t.costs },
+      { label: t.growth, value: t.growth },
     ],
     [t]
   );
@@ -169,174 +140,138 @@ export default function ChatPage() {
 
   useEffect(() => {
     textareaRef.current?.focus();
-    loadConversationHistory();
+    loadConversations();
   }, []);
 
-  // Close delete modal with Escape
   useEffect(() => {
+    if (!deleteTargetId) return;
+
     function handleEscape(event: globalThis.KeyboardEvent) {
       if (event.key === "Escape" && !isDeleting) {
-        setConversationToDelete(null);
-        setDeleteError(false);
+        setDeleteTargetId(null);
       }
     }
 
-    if (conversationToDelete) {
-      window.addEventListener("keydown", handleEscape);
-    }
+    document.addEventListener("keydown", handleEscape);
 
     return () => {
-      window.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("keydown", handleEscape);
     };
-  }, [conversationToDelete, isDeleting]);
+  }, [deleteTargetId, isDeleting]);
 
-  async function loadConversationHistory() {
+  async function loadConversations() {
+    const token = localStorage.getItem("herai_access_token");
+
+    if (!token) return;
+
     try {
-      setLoadingHistory(true);
+      const convList = await getConversations(token);
+      setConversations(convList);
+    } catch (err) {
+      console.error("Failed to load conversations:", err);
+    }
+  }
 
-      const token =
-        localStorage.getItem("herai_access_token") ||
-        
-        "";
+  function requestDeleteConversation(
+    e: React.MouseEvent,
+    id: string
+  ) {
+    e.stopPropagation();
 
-      if (!token) {
-        return;
+    if (isDeleting) return;
+
+    setDeleteTargetId(id);
+  }
+
+  function cancelDelete() {
+    if (isDeleting) return;
+
+    setDeleteTargetId(null);
+  }
+
+  async function confirmDeleteConversation() {
+    if (!deleteTargetId || isDeleting) return;
+
+    const token = localStorage.getItem("herai_access_token");
+
+    if (!token) {
+      setDeleteTargetId(null);
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const ok = await deleteConversation(
+        deleteTargetId,
+        token
+      );
+
+      if (ok) {
+        setConversations((prev) =>
+          prev.filter(
+            (conversation) =>
+              conversation.id !== deleteTargetId
+          )
+        );
+
+        if (activeConvId === deleteTargetId) {
+          setActiveConvId(null);
+          setMessages([]);
+        }
+
+        setDeleteTargetId(null);
       }
-
-      const history = await getConversations(token);
-
-      setConversations(history);
-    } catch (error) {
-      console.error("Failed to load chat history:", error);
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
     } finally {
-      setLoadingHistory(false);
+      setIsDeleting(false);
     }
   }
 
   function startNewChat() {
     setMessages([]);
+    setActiveConvId(null);
     setInput("");
     setIsTyping(false);
-    setConversationId(undefined);
 
     setTimeout(() => {
       textareaRef.current?.focus();
     }, 0);
   }
 
-  function requestDeleteConversation(id: string) {
-    const conversation = conversations.find(
-      (item) => item.id === id
-    );
+  function selectConversation(
+    conv: ConversationSummary
+  ) {
+    setActiveConvId(conv.id);
 
-    if (!conversation) {
-      return;
+    const msgs: Message[] = [];
+    const baseId =
+      new Date(conv.created_at).getTime() || Date.now();
+
+    if (conv.user_message) {
+      msgs.push({
+        id: baseId,
+        role: "user",
+        content: conv.user_message,
+      });
     }
 
-    setDeleteError(false);
-    setConversationToDelete(conversation);
-  }
-
-  async function confirmDeleteConversation() {
-    if (!conversationToDelete || isDeleting) {
-      return;
+    if (conv.assistant_message) {
+      msgs.push({
+        id: baseId + 1,
+        role: "assistant",
+        content: conv.assistant_message,
+      });
     }
 
-    try {
-      setIsDeleting(true);
-      setDeleteError(false);
-
-      const token =
-        localStorage.getItem("herai_access_token") ||
-        
-        "";
-
-      if (!token) {
-        throw new Error("No authentication token");
-      }
-
-      await deleteConversation(conversationToDelete.id, token);
-
-      // If the deleted conversation is currently open,
-      // return to a fresh chat.
-      if (conversationId === conversationToDelete.id) {
-        setMessages([]);
-        setInput("");
-        setConversationId(undefined);
-        setIsTyping(false);
-      }
-
-      // Remove it immediately from the sidebar.
-      setConversations((current) =>
-        current.filter(
-          (conversation) =>
-            conversation.id !== conversationToDelete.id
-        )
-      );
-
-      setConversationToDelete(null);
-
-      setTimeout(() => {
-        textareaRef.current?.focus();
-      }, 0);
-    } catch (error) {
-      console.error("Failed to delete conversation:", error);
-      setDeleteError(true);
-    } finally {
-      setIsDeleting(false);
-    }
-  }
-
-  async function openConversation(id: string) {
-    try {
-      setIsTyping(true);
-
-      const token =
-        localStorage.getItem("herai_access_token") ||
-        
-        "";
-
-      if (!token) {
-        throw new Error("No authentication token");
-      }
-
-      const savedMessages = await getConversationMessages(id, token);
-
-      setConversationId(id);
-
-      setMessages(
-        savedMessages.map((message, index) => ({
-          id: index + 1,
-          role: message.role,
-          content: message.content,
-        }))
-      );
-    } catch (error) {
-      console.error("Failed to open conversation:", error);
-    } finally {
-      setIsTyping(false);
-
-      setTimeout(() => {
-        textareaRef.current?.focus();
-      }, 0);
-    }
-  }
-
-  function handleLogout() {
-    localStorage.removeItem("herai_user");
-    localStorage.removeItem("herai_session");
-    localStorage.removeItem("herai_access_token");
-    localStorage.removeItem("herai_refresh_token");
-
-    window.location.href = "/login";
+    setMessages(msgs);
   }
 
   async function sendMessage(value?: string) {
     const text = (value ?? input).trim();
 
-    if (!text || isTyping) {
-      return;
-    }
+    if (!text || isTyping) return;
 
     const userMessage: Message = {
       id: Date.now(),
@@ -344,35 +279,27 @@ export default function ChatPage() {
       content: text,
     };
 
-    setMessages((current) => [...current, userMessage]);
+    setMessages((current) => [
+      ...current,
+      userMessage,
+    ]);
+
     setInput("");
     setIsTyping(true);
 
     try {
       const token =
         localStorage.getItem("herai_access_token") ||
-        
-        "";
-
-      if (!token) {
-        throw new Error("No authentication token");
-      }
+        "dummy_token";
 
       const request: ChatRequest = {
         message: text,
         region_code: country,
         language: lang,
-        conversation_id: conversationId,
       };
 
-      const response: ChatResponse = await sendChatMessage(
-        request,
-        token
-      );
-
-      if (response.conversation_id) {
-        setConversationId(response.conversation_id);
-      }
+      const response: ChatResponse =
+        await sendChatMessage(request, token);
 
       const assistantMessage: Message = {
         id: Date.now() + 1,
@@ -380,10 +307,13 @@ export default function ChatPage() {
         content: response.response,
       };
 
-      setMessages((current) => [...current, assistantMessage]);
+      setMessages((current) => [
+        ...current,
+        assistantMessage,
+      ]);
 
-      await loadConversationHistory();
-    } catch (err: any) {
+      loadConversations();
+    } catch (err: unknown) {
       console.error("Chat error:", err);
 
       const errorMessage: Message = {
@@ -392,13 +322,18 @@ export default function ChatPage() {
         content: t.error,
       };
 
-      setMessages((current) => [...current, errorMessage]);
+      setMessages((current) => [
+        ...current,
+        errorMessage,
+      ]);
     } finally {
       setIsTyping(false);
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
     sendMessage();
   }
@@ -406,7 +341,10 @@ export default function ChatPage() {
   function handleKeyDown(
     event: KeyboardEvent<HTMLTextAreaElement>
   ) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
       event.preventDefault();
       sendMessage();
     }
@@ -430,12 +368,16 @@ export default function ChatPage() {
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Country */}
             <label className="relative">
-              <span className="sr-only">Select country</span>
+              <span className="sr-only">
+                Select country
+              </span>
 
               <select
                 value={country}
                 onChange={(event) =>
-                  setCountry(event.target.value as Country)
+                  setCountry(
+                    event.target.value as Country
+                  )
                 }
                 className="h-9 cursor-pointer appearance-none rounded-full border border-[#1A1A1A]/10 bg-white py-1 pl-3 pr-7 text-xs font-medium outline-none transition hover:border-[#B8860B]/50 focus:border-[#B8860B]"
               >
@@ -482,133 +424,118 @@ export default function ChatPage() {
               </button>
             </div>
 
-            {/* Profile */}
-            <Link
+            {/* Single Profile Button */}
+            <a
               href="/profile"
-              className="hidden h-9 items-center rounded-full border border-[#1A1A1A]/10 bg-white px-4 text-xs font-semibold transition hover:bg-[#1A1A1A]/[0.03] sm:inline-flex"
+              className="h-9 items-center rounded-full border border-[#1A1A1A]/10 bg-white px-4 text-xs font-semibold transition hover:bg-[#1A1A1A]/[0.03]"
             >
               {t.profile}
-            </Link>
-
-            {/* Logout */}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="h-9 rounded-full bg-[#1A1A1A] px-4 text-xs font-semibold text-white transition hover:bg-[#333]"
-            >
-              {t.logout}
-            </button>
+            </a>
           </div>
         </div>
       </header>
 
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl">
-        {/* Desktop sidebar */}
-        <aside className="hidden w-64 shrink-0 border-e border-[#1A1A1A]/10 p-5 lg:flex lg:flex-col">
-          {/* New chat */}
+        {/* Desktop Sidebar */}
+        <aside className="hidden w-72 shrink-0 border-e border-[#1A1A1A]/10 p-5 lg:flex lg:flex-col">
           <button
             type="button"
             onClick={startNewChat}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#1A1A1A] px-4 text-sm font-semibold text-white transition hover:bg-[#2B2B2B]"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#1A1A1A] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2B2B2B]"
           >
             <span className="text-base">+</span>
             {t.newChat}
           </button>
 
-          {/* History */}
-          <div className="mt-8 min-h-0 flex-1">
-            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#1A1A1A]/35">
-              {t.history}
+          {/* Chat History */}
+          <div className="mt-6 flex-1 overflow-y-auto">
+            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#1A1A1A]/40">
+              {t.recentChats}
             </p>
 
-            <div className="mt-3 max-h-[calc(100vh-15rem)] space-y-2 overflow-y-auto pr-1">
-              {loadingHistory ? (
-                <div className="rounded-2xl border border-[#1A1A1A]/10 bg-white p-4 text-xs text-[#1A1A1A]/40">
-                  {t.loadingHistory}
-                </div>
-              ) : conversations.length === 0 ? (
-                <div className="rounded-2xl border border-[#1A1A1A]/10 bg-white p-4 text-xs leading-5 text-[#1A1A1A]/40">
-                  {t.noHistory}
-                </div>
+            <div className="mt-2 space-y-1.5">
+              {conversations.length === 0 ? (
+                <p className="px-2 py-4 text-xs text-[#1A1A1A]/35">
+                  {t.noChats}
+                </p>
               ) : (
-                conversations.map((conversation) => {
-                  const conversationTitle =
-                    conversation.title?.trim() ||
-                    conversation.domain_scope?.trim() ||
-                    t.newConversation;
+                conversations.map((conv) => {
+                  const isActive =
+                    activeConvId === conv.id;
 
                   return (
                     <div
-                      key={conversation.id}
-                      className={`group relative rounded-2xl border transition ${
-                        conversation.id === conversationId
-                          ? "border-[#B8860B]/40 bg-[#B8860B]/[0.06]"
-                          : "border-[#1A1A1A]/10 bg-white hover:border-[#B8860B]/30 hover:bg-[#B8860B]/[0.02]"
+                      key={conv.id}
+                      className={`group relative flex w-full items-center rounded-xl transition ${
+                        isActive
+                          ? "bg-[#B8860B]/15"
+                          : "hover:bg-[#1A1A1A]/5"
                       }`}
                     >
-                      {/* Open conversation */}
                       <button
                         type="button"
                         onClick={() =>
-                          openConversation(conversation.id)
+                          selectConversation(conv)
                         }
-                        className="w-full p-4 text-start"
+                        className={`flex flex-1 flex-col px-3 py-2.5 text-start ${
+                          isActive
+                            ? "font-semibold text-[#B8860B]"
+                            : "text-[#1A1A1A]/75"
+                        }`}
                       >
-                        <div className="flex items-start gap-3 pr-8">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#B8860B]/10 text-xs font-bold text-[#B8860B]">
-                            H
-                          </div>
+                        <span className="truncate pr-6 text-xs font-medium">
+                          {conv.title}
+                        </span>
 
-                          <div className="min-w-0 flex-1">
-                            <p
-                              title={conversationTitle}
-                              className="truncate text-sm font-semibold text-[#1A1A1A]"
-                            >
-                              {conversationTitle}
-                            </p>
-
-                            <p className="mt-1 text-[10px] text-[#1A1A1A]/40">
-                              {conversation.created_at
-                                ? new Date(
-                                    conversation.created_at
-                                  ).toLocaleDateString(
-                                    lang === "ar"
-                                      ? "ar-EG"
-                                      : "en-US",
-                                    {
-                                      day: "numeric",
-                                      month: "short",
-                                      year: "numeric",
-                                    }
-                                  )
-                                : ""}
-                            </p>
-                          </div>
-                        </div>
+                        <span className="mt-0.5 text-[10px] text-[#1A1A1A]/35">
+                          {new Date(
+                            conv.created_at
+                          ).toLocaleDateString()}
+                        </span>
                       </button>
 
                       {/* Delete button */}
                       <button
                         type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
+                        onClick={(e) =>
                           requestDeleteConversation(
-                            conversation.id
-                          );
-                        }}
-                        aria-label={`${t.delete}: ${conversationTitle}`}
+                            e,
+                            conv.id
+                          )
+                        }
                         title={t.delete}
-                        className={`absolute top-3 flex h-8 w-8 items-center justify-center rounded-xl text-sm transition ${
-                          lang === "ar"
-                            ? "left-3"
-                            : "right-3"
-                        } ${
-                          conversation.id === conversationId
-                            ? "bg-[#1A1A1A]/[0.06] text-[#1A1A1A]/45 hover:bg-red-50 hover:text-red-600"
-                            : "bg-[#1A1A1A]/[0.04] text-[#1A1A1A]/35 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600"
-                        }`}
+                        aria-label={t.delete}
+                        className="absolute right-2 top-1/2 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[#1A1A1A]/30 transition hover:bg-red-100 hover:text-red-600 group-hover:flex"
                       >
-                        <span aria-hidden="true">🗑</span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          className="h-4 w-4"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 6h18"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 6l-.7 13.1A2 2 0 0 1 16.3 21H7.7a2 2 0 0 1-2-1.9L5 6"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M10 10v7M14 10v7"
+                          />
+                        </svg>
                       </button>
                     </div>
                   );
@@ -616,29 +543,11 @@ export default function ChatPage() {
               )}
             </div>
           </div>
-
-          {/* Sidebar bottom actions */}
-          <div className="mt-4 space-y-2">
-            <Link
-              href="/profile"
-              className="flex h-10 w-full items-center justify-center rounded-xl border border-[#1A1A1A]/10 bg-white text-xs font-semibold transition hover:bg-[#1A1A1A]/[0.03]"
-            >
-              {t.profile}
-            </Link>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex h-10 w-full items-center justify-center rounded-xl border border-[#1A1A1A]/10 bg-white text-xs font-semibold text-[#1A1A1A]/70 transition hover:bg-[#1A1A1A]/[0.03]"
-            >
-              {t.logout}
-            </button>
-          </div>
         </aside>
 
-        {/* Chat */}
+        {/* Chat Area */}
         <section className="flex min-w-0 flex-1 flex-col">
-          {/* Mobile controls */}
+          {/* Mobile New Chat Bar */}
           <div className="flex items-center justify-between border-b border-[#1A1A1A]/10 px-4 py-3 lg:hidden">
             <span className="text-xs font-medium text-[#1A1A1A]/45">
               HerAI · {t.country[country]}
@@ -654,7 +563,7 @@ export default function ChatPage() {
           </div>
 
           <div className="flex flex-1 flex-col">
-            {/* Empty state */}
+            {/* Empty State */}
             {!hasMessages ? (
               <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-12 sm:px-8">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1A1A1A] text-xl font-semibold text-white shadow-lg shadow-[#1A1A1A]/10">
@@ -670,27 +579,37 @@ export default function ChatPage() {
                 </p>
 
                 <div className="mt-9 grid w-full max-w-2xl gap-3 sm:grid-cols-2">
-                  {suggestions.map((suggestion) => (
-                    <button
-                      key={suggestion.label}
-                      type="button"
-                      onClick={() =>
-                        sendMessage(suggestion.value)
-                      }
-                      dir={lang === "ar" ? "rtl" : "ltr"}
-                      className="group rounded-2xl border border-[#1A1A1A]/10 bg-white p-4 text-start transition hover:-translate-y-0.5 hover:border-[#B8860B]/35 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-medium">
-                          {suggestion.label}
-                        </span>
+                  {suggestions.map(
+                    (suggestion) => (
+                      <button
+                        key={suggestion.label}
+                        type="button"
+                        onClick={() =>
+                          sendMessage(
+                            suggestion.value
+                          )
+                        }
+                        dir={
+                          lang === "ar"
+                            ? "rtl"
+                            : "ltr"
+                        }
+                        className="group rounded-2xl border border-[#1A1A1A]/10 bg-white p-4 text-start transition hover:-translate-y-0.5 hover:border-[#B8860B]/35 hover:shadow-md"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium">
+                            {suggestion.label}
+                          </span>
 
-                        <span className="text-[#1A1A1A]/20 transition group-hover:text-[#B8860B]">
-                          {lang === "ar" ? "←" : "→"}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+                          <span className="text-[#1A1A1A]/20 transition group-hover:text-[#B8860B]">
+                            {lang === "ar"
+                              ? "←"
+                              : "→"}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
             ) : (
@@ -707,7 +626,8 @@ export default function ChatPage() {
                           : "justify-start"
                       }`}
                     >
-                      {message.role === "assistant" ? (
+                      {message.role ===
+                      "assistant" ? (
                         <div className="flex max-w-[88%] items-start gap-3 sm:max-w-[80%]">
                           <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#1A1A1A] text-[11px] font-bold text-white">
                             H
@@ -716,7 +636,9 @@ export default function ChatPage() {
                           <div>
                             <div
                               dir={
-                                lang === "ar" ? "rtl" : "ltr"
+                                lang === "ar"
+                                  ? "rtl"
+                                  : "ltr"
                               }
                               className={`whitespace-pre-wrap rounded-2xl border border-[#1A1A1A]/10 bg-white px-4 py-3.5 text-sm leading-7 shadow-sm ${
                                 lang === "ar"
@@ -738,7 +660,9 @@ export default function ChatPage() {
                       ) : (
                         <div
                           dir={
-                            lang === "ar" ? "rtl" : "ltr"
+                            lang === "ar"
+                              ? "rtl"
+                              : "ltr"
                           }
                           className={`max-w-[82%] whitespace-pre-wrap rounded-2xl bg-[#1A1A1A] px-4 py-3.5 text-sm leading-7 text-white shadow-sm sm:max-w-[72%] ${
                             lang === "ar"
@@ -782,7 +706,11 @@ export default function ChatPage() {
               <div className="mx-auto max-w-3xl">
                 <form onSubmit={handleSubmit}>
                   <div
-                    dir={lang === "ar" ? "rtl" : "ltr"}
+                    dir={
+                      lang === "ar"
+                        ? "rtl"
+                        : "ltr"
+                    }
                     className="relative rounded-3xl border border-[#1A1A1A]/15 bg-white p-2 shadow-lg shadow-[#1A1A1A]/5 focus-within:border-[#B8860B]/50"
                   >
                     <textarea
@@ -794,7 +722,9 @@ export default function ChatPage() {
                       onKeyDown={handleKeyDown}
                       rows={1}
                       dir={
-                        lang === "ar" ? "rtl" : "ltr"
+                        lang === "ar"
+                          ? "rtl"
+                          : "ltr"
                       }
                       placeholder={t.placeholder}
                       disabled={isTyping}
@@ -807,7 +737,10 @@ export default function ChatPage() {
 
                     <button
                       type="submit"
-                      disabled={!input.trim() || isTyping}
+                      disabled={
+                        !input.trim() ||
+                        isTyping
+                      }
                       aria-label={t.send}
                       className={`absolute bottom-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#B8860B] text-white transition hover:bg-[#96700A] disabled:cursor-not-allowed disabled:bg-[#B8860B]/25 ${
                         lang === "ar"
@@ -815,14 +748,20 @@ export default function ChatPage() {
                           : "right-2.5"
                       }`}
                     >
-                      <span className="text-sm">↑</span>
+                      <span className="text-sm">
+                        ↑
+                      </span>
                     </button>
                   </div>
                 </form>
 
                 <div className="mt-3 flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-start">
                   <p
-                    dir={lang === "ar" ? "rtl" : "ltr"}
+                    dir={
+                      lang === "ar"
+                        ? "rtl"
+                        : "ltr"
+                    }
                     className="text-[10px] leading-5 text-[#1A1A1A]/35"
                   >
                     {t.safety}
@@ -841,98 +780,104 @@ export default function ChatPage() {
         </section>
       </div>
 
-      {/* ========================================================= */}
-      {/* CUSTOM DELETE CONFIRMATION MODAL                         */}
-      {/* ========================================================= */}
-      {conversationToDelete && (
+      {/* Delete Confirmation Modal */}
+      {deleteTargetId && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1A1A1A]/35 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1A1A1A]/40 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
           onMouseDown={(event) => {
             if (
               event.target === event.currentTarget &&
               !isDeleting
             ) {
-              setConversationToDelete(null);
-              setDeleteError(false);
+              setDeleteTargetId(null);
             }
           }}
         >
           <div
-            dir={lang === "ar" ? "rtl" : "ltr"}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-dialog-title"
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-[#1A1A1A]/10 bg-[#FBF7EC] shadow-2xl shadow-[#1A1A1A]/20"
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[#1A1A1A]/10 bg-[#FBF7EC] shadow-2xl"
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
           >
-            {/* Modal top */}
             <div className="p-6 sm:p-7">
               <div className="flex items-start gap-4">
-                {/* Trash icon */}
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-lg">
-                  🗑
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-5 w-5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v4"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 17h.01"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M10.3 4.6 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.6a2 2 0 0 0-3.4 0Z"
+                    />
+                  </svg>
                 </div>
 
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                   <h2
                     id="delete-dialog-title"
-                    className="text-lg font-semibold tracking-tight text-[#1A1A1A]"
+                    className="text-lg font-semibold tracking-tight"
                   >
                     {t.deleteTitle}
                   </h2>
 
-                  <p className="mt-2 text-sm leading-6 text-[#1A1A1A]/55">
-                    {t.deleteDescription}
+                  <p
+                    dir={
+                      lang === "ar"
+                        ? "rtl"
+                        : "ltr"
+                    }
+                    className="mt-2 text-sm leading-6 text-[#1A1A1A]/55"
+                  >
+                    {t.deleteMessage}
                   </p>
                 </div>
               </div>
-
-              {/* Conversation being deleted */}
-              <div className="mt-5 rounded-2xl border border-[#1A1A1A]/10 bg-white p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#B8860B]/10 text-xs font-bold text-[#B8860B]">
-                    H
-                  </div>
-
-                  <p className="min-w-0 truncate text-sm font-semibold text-[#1A1A1A]">
-                    {conversationToDelete.title?.trim() ||
-                      conversationToDelete.domain_scope?.trim() ||
-                      t.newConversation}
-                  </p>
-                </div>
-              </div>
-
-              {/* Error */}
-              {deleteError && (
-                <div
-                  role="alert"
-                  className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700"
-                >
-                  {t.deleteError}
-                </div>
-              )}
             </div>
 
-            {/* Modal actions */}
-            <div className="flex flex-col-reverse gap-2 border-t border-[#1A1A1A]/10 bg-white/60 p-4 sm:flex-row sm:justify-end">
+            <div
+              className={`flex gap-3 border-t border-[#1A1A1A]/10 bg-white/60 p-4 ${
+                lang === "ar"
+                  ? "flex-row-reverse"
+                  : "flex-row justify-end"
+              }`}
+            >
               <button
                 type="button"
+                onClick={cancelDelete}
                 disabled={isDeleting}
-                onClick={() => {
-                  setConversationToDelete(null);
-                  setDeleteError(false);
-                }}
-                className="h-11 rounded-2xl border border-[#1A1A1A]/10 bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#1A1A1A]/[0.03] disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-[#1A1A1A]/10 bg-white px-5 py-2.5 text-sm font-semibold text-[#1A1A1A]/70 transition hover:bg-[#1A1A1A]/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t.cancel}
               </button>
 
               <button
                 type="button"
-                disabled={isDeleting}
                 onClick={confirmDeleteConversation}
-                className="h-11 rounded-2xl bg-red-600 px-5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isDeleting}
+                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isDeleting ? t.deleting : t.deleteConfirm}
+                {isDeleting
+                  ? t.deleting
+                  : t.delete}
               </button>
             </div>
           </div>
