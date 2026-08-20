@@ -4,6 +4,8 @@ type DraftInput = {
   persona?: string
   domain?: string
   adjustmentInstruction?: string
+  language?: string
+  supabase?: any  // Supabase client to fetch council rules
 }
 
 // Domain-specific system prompts
@@ -52,10 +54,15 @@ type Verdict = {
   matched_rule_ids: string[]
 }
 
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
+const OPENAI_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
-async function openaiChat(messages: {role: string; content: string}[], model = 'gpt-4o-mini', apiKey?: string) {
+async function openaiChat(messages: {role: string; content: string}[], model = 'allam-2-7b', apiKey?: string, jsonMode = false) {
   if (!apiKey) throw new Error('OPENAI_API_KEY is required')
+
+  const payload: any = { model, messages, max_tokens: 800, temperature: 0.2 }
+  if (jsonMode) {
+    payload.response_format = { type: 'json_object' }
+  }
 
   const res = await fetch(OPENAI_API_URL, {
     method: 'POST',
@@ -63,7 +70,7 @@ async function openaiChat(messages: {role: string; content: string}[], model = '
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model, messages, max_tokens: 800, temperature: 0.2 }),
+    body: JSON.stringify(payload),
   })
 
   if (!res.ok) {
@@ -80,25 +87,46 @@ function getSystemPrompt(input: DraftInput): string {
   const domain = input.domain?.toLowerCase() || 'default'
   const domainPrompt = DOMAIN_PROMPTS[domain] || DOMAIN_PROMPTS.default
   
-  // Add region and persona context to domain-specific prompt
   const regionContext = input.region ? `\nRegion: ${input.region}` : ''
   const personaContext = input.persona ? ` (Persona: ${input.persona})` : ''
   const adjustmentContext = input.adjustmentInstruction ? `\nCRITICAL INSTRUCTION: ${input.adjustmentInstruction}` : ''
+  const languageContext = input.language ? `\nIMPORTANT: You MUST respond in ${input.language === 'ar' ? 'Arabic' : 'English'}, regardless of the language the user types in.` : ''
   
-  return `${domainPrompt}${regionContext}${personaContext}${adjustmentContext}`
+  return `${domainPrompt}${regionContext}${personaContext}${adjustmentContext}${languageContext}`
+}
+
+async function fetchCouncilRules(supabase: any, domain?: string, regionCode?: string): Promise<string> {
+  try {
+    let query = supabase.from('council_rules').select('title, rule_text').eq('is_active', true)
+    if (domain) query = query.or(`domain.eq.${domain},domain.is.null`)
+    if (regionCode) query = query.or(`region_code.eq.${regionCode},region_code.is.null`)
+
+    const { data, error } = await query
+    if (error || !data || data.length === 0) return ''
+
+    const rulesBlock = data.map((r: any) => `- [${r.title}]: ${r.rule_text}`).join('\n')
+    return `\n\nCOUNCIL RULES (you MUST follow these):\n${rulesBlock}`
+  } catch {
+    return ''
+  }
 }
 
 export async function generateDraft(input: DraftInput, openaiApiKey: string): Promise<string> {
   const apiKey = openaiApiKey
   if (!apiKey) throw new Error('OPENAI_API_KEY is required')
 
-  const systemPrompt = getSystemPrompt(input)
+  // Fetch council rules if supabase is available
+  const rulesContext = input.supabase
+    ? await fetchCouncilRules(input.supabase, input.domain, input.region)
+    : ''
+
+  const systemPrompt = getSystemPrompt(input) + rulesContext
   const messages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: input.message },
   ]
 
-  const reply = await openaiChat(messages, 'gpt-4o-mini', apiKey)
+  const reply = await openaiChat(messages, 'allam-2-7b', apiKey)
   return reply
 }
 
@@ -113,10 +141,18 @@ export async function evaluateSafety(draft: string, openaiApiKey: string): Promi
     { role: 'user', content: instruction },
   ]
 
-  const reply = await openaiChat(messages, 'gpt-4o-mini', apiKey)
+  const reply = await openaiChat(messages, 'allam-2-7b', apiKey, true)
 
   try {
-    const parsed = JSON.parse(reply)
+    let cleanReply = reply.trim()
+    
+    // Attempt to extract JSON if it was wrapped in code blocks or conversational padding
+    const jsonMatch = cleanReply.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      cleanReply = jsonMatch[0]
+    }
+    
+    const parsed = JSON.parse(cleanReply)
     return {
       bias_score: Number(parsed.bias_score ?? 0),
       risk_score: Number(parsed.risk_score ?? 0),
