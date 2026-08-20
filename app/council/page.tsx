@@ -136,7 +136,7 @@ export default function CouncilPage() {
       <div className="mx-auto max-w-5xl">
         {/* HEADER */}
         <header className="flex items-center justify-between border-b border-[#1A1A1A]/10 pb-5">
-          <Link href="/" className="text-lg font-semibold tracking-tight">HerAI Mashroo3</Link>
+          <Link href="/profile" className="text-lg font-semibold tracking-tight">HerAI Mashroo3</Link>
           <div className="flex gap-3">
             <Link href="/profile" className="rounded-full border border-[#1A1A1A]/10 px-5 py-2.5 text-xs font-semibold text-[#1A1A1A] transition hover:bg-[#1A1A1A]/5">Profile</Link>
             <button type="button" onClick={handleLogout} className="rounded-full bg-[#1A1A1A] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#333]">Log out</button>

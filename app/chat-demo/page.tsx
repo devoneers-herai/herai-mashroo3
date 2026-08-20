@@ -286,7 +286,7 @@ export default function ChatPage() {
             </p>
 
             <a
-              href={pilotFormUrl}
+              href= "/login"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 inline-flex text-xs font-semibold text-[#96700A] hover:underline"

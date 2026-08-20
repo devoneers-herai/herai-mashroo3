@@ -26,13 +26,10 @@ type Message = {
   content: string;
 };
 
-const pilotFormUrl =
-  "https://docs.google.com/forms/d/e/1FAIpQLSc3VlgXHo7Uohw5n07HXfDxr012KoWiLzkBnLyfkAEWh7xt_g/viewform";
-
 const copy = {
   en: {
     brand: "HerAI Mashroo3",
-    back: "Back to website",
+    profile: "Profile",
     newChat: "New chat",
     title: "How can I help with your business?",
     subtitle:
@@ -56,11 +53,17 @@ const copy = {
       EG: "Egypt",
     },
     language: "Language",
+    deleteTitle: "Delete this chat?",
+    deleteMessage:
+      "Are you sure you want to delete this conversation? This action cannot be undone.",
+    cancel: "Cancel",
+    delete: "Delete",
+    deleting: "Deleting...",
   },
 
   ar: {
     brand: "HerAI Mashroo3",
-    back: "العودة للموقع",
+    profile: "الملف الشخصي",
     newChat: "محادثة جديدة",
     title: "إزاي ممكن أساعدك في شغلك؟",
     subtitle:
@@ -84,6 +87,12 @@ const copy = {
       EG: "مصر",
     },
     language: "اللغة",
+    deleteTitle: "حذف المحادثة؟",
+    deleteMessage:
+      "هل أنتِ متأكدة من حذف هذه المحادثة؟ لا يمكن التراجع عن هذا الإجراء.",
+    cancel: "إلغاء",
+    delete: "حذف",
+    deleting: "جاري الحذف...",
   },
 } as const;
 
@@ -92,9 +101,16 @@ export default function ChatPage() {
   const [country, setCountry] = useState<Country>("EG");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [conversations, setConversations] = useState<
+    ConversationSummary[]
+  >([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(
+    null
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -117,7 +133,9 @@ export default function ChatPage() {
   }, [lang]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
   }, [messages, isTyping]);
 
   useEffect(() => {
@@ -125,8 +143,25 @@ export default function ChatPage() {
     loadConversations();
   }, []);
 
+  useEffect(() => {
+    if (!deleteTargetId) return;
+
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape" && !isDeleting) {
+        setDeleteTargetId(null);
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [deleteTargetId, isDeleting]);
+
   async function loadConversations() {
     const token = localStorage.getItem("herai_access_token");
+
     if (!token) return;
 
     try {
@@ -137,17 +172,60 @@ export default function ChatPage() {
     }
   }
 
-  async function handleDeleteConversation(e: React.MouseEvent, id: string) {
+  function requestDeleteConversation(
+    e: React.MouseEvent,
+    id: string
+  ) {
     e.stopPropagation();
+
+    if (isDeleting) return;
+
+    setDeleteTargetId(id);
+  }
+
+  function cancelDelete() {
+    if (isDeleting) return;
+
+    setDeleteTargetId(null);
+  }
+
+  async function confirmDeleteConversation() {
+    if (!deleteTargetId || isDeleting) return;
+
     const token = localStorage.getItem("herai_access_token");
-    if (!token) return;
-    const ok = await deleteConversation(id, token);
-    if (ok) {
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-      if (activeConvId === id) {
-        setActiveConvId(null);
-        setMessages([]);
+
+    if (!token) {
+      setDeleteTargetId(null);
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const ok = await deleteConversation(
+        deleteTargetId,
+        token
+      );
+
+      if (ok) {
+        setConversations((prev) =>
+          prev.filter(
+            (conversation) =>
+              conversation.id !== deleteTargetId
+          )
+        );
+
+        if (activeConvId === deleteTargetId) {
+          setActiveConvId(null);
+          setMessages([]);
+        }
+
+        setDeleteTargetId(null);
       }
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -162,10 +240,14 @@ export default function ChatPage() {
     }, 0);
   }
 
-  function selectConversation(conv: ConversationSummary) {
+  function selectConversation(
+    conv: ConversationSummary
+  ) {
     setActiveConvId(conv.id);
+
     const msgs: Message[] = [];
-    const baseId = new Date(conv.created_at).getTime() || Date.now();
+    const baseId =
+      new Date(conv.created_at).getTime() || Date.now();
 
     if (conv.user_message) {
       msgs.push({
@@ -197,13 +279,18 @@ export default function ChatPage() {
       content: text,
     };
 
-    setMessages((current) => [...current, userMessage]);
+    setMessages((current) => [
+      ...current,
+      userMessage,
+    ]);
+
     setInput("");
     setIsTyping(true);
 
     try {
       const token =
-        localStorage.getItem("herai_access_token") || "dummy_token";
+        localStorage.getItem("herai_access_token") ||
+        "dummy_token";
 
       const request: ChatRequest = {
         message: text,
@@ -211,7 +298,8 @@ export default function ChatPage() {
         language: lang,
       };
 
-      const response: ChatResponse = await sendChatMessage(request, token);
+      const response: ChatResponse =
+        await sendChatMessage(request, token);
 
       const assistantMessage: Message = {
         id: Date.now() + 1,
@@ -219,30 +307,44 @@ export default function ChatPage() {
         content: response.response,
       };
 
-      setMessages((current) => [...current, assistantMessage]);
+      setMessages((current) => [
+        ...current,
+        assistantMessage,
+      ]);
 
-      // Refresh sidebar list after sending
       loadConversations();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Chat error:", err);
+
       const errorMessage: Message = {
         id: Date.now() + 1,
         role: "assistant",
         content: t.error,
       };
-      setMessages((current) => [...current, errorMessage]);
+
+      setMessages((current) => [
+        ...current,
+        errorMessage,
+      ]);
     } finally {
       setIsTyping(false);
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
     sendMessage();
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>
+  ) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
       event.preventDefault();
       sendMessage();
     }
@@ -255,29 +357,37 @@ export default function ChatPage() {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-[#1A1A1A]/10 bg-[#FBF7EC]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <a
-            href="/"
-            className="flex shrink-0 items-center gap-3 text-sm font-semibold tracking-tight"
-          >
+          <div className="flex shrink-0 items-center gap-3 text-sm font-semibold tracking-tight">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1A1A1A] text-xs text-white">
               H
             </span>
+
             <span>{t.brand}</span>
-          </a>
+          </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Country */}
             <label className="relative">
-              <span className="sr-only">Select country</span>
+              <span className="sr-only">
+                Select country
+              </span>
+
               <select
                 value={country}
                 onChange={(event) =>
-                  setCountry(event.target.value as Country)
+                  setCountry(
+                    event.target.value as Country
+                  )
                 }
                 className="h-9 cursor-pointer appearance-none rounded-full border border-[#1A1A1A]/10 bg-white py-1 pl-3 pr-7 text-xs font-medium outline-none transition hover:border-[#B8860B]/50 focus:border-[#B8860B]"
               >
-                <option value="LB">🇱🇧 {t.country.LB}</option>
-                <option value="EG">🇪🇬 {t.country.EG}</option>
+                <option value="LB">
+                  🇱🇧 {t.country.LB}
+                </option>
+
+                <option value="EG">
+                  🇪🇬 {t.country.EG}
+                </option>
               </select>
             </label>
 
@@ -314,27 +424,19 @@ export default function ChatPage() {
               </button>
             </div>
 
-            {/* Profile Link */}
+            {/* Single Profile Button */}
             <a
               href="/profile"
-              className="hidden h-9 items-center rounded-full border border-[#1A1A1A]/10 bg-white px-4 text-xs font-semibold transition hover:bg-[#1A1A1A]/[0.03] sm:inline-flex"
+              className="h-9 items-center rounded-full border border-[#1A1A1A]/10 bg-white px-4 text-xs font-semibold transition hover:bg-[#1A1A1A]/[0.03]"
             >
-              Profile
-            </a>
-
-            {/* Back */}
-            <a
-              href="/"
-              className="hidden h-9 items-center rounded-full border border-[#1A1A1A]/10 bg-white px-4 text-xs font-semibold transition hover:bg-[#1A1A1A]/[0.03] sm:inline-flex"
-            >
-              {t.back}
+              {t.profile}
             </a>
           </div>
         </div>
       </header>
 
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl">
-        {/* Desktop ChatGPT-Style Sidebar */}
+        {/* Desktop Sidebar */}
         <aside className="hidden w-72 shrink-0 border-e border-[#1A1A1A]/10 p-5 lg:flex lg:flex-col">
           <button
             type="button"
@@ -345,7 +447,7 @@ export default function ChatPage() {
             {t.newChat}
           </button>
 
-          {/* ChatGPT-style History List */}
+          {/* Chat History */}
           <div className="mt-6 flex-1 overflow-y-auto">
             <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#1A1A1A]/40">
               {t.recentChats}
@@ -358,7 +460,9 @@ export default function ChatPage() {
                 </p>
               ) : (
                 conversations.map((conv) => {
-                  const isActive = activeConvId === conv.id;
+                  const isActive =
+                    activeConvId === conv.id;
+
                   return (
                     <div
                       key={conv.id}
@@ -370,27 +474,68 @@ export default function ChatPage() {
                     >
                       <button
                         type="button"
-                        onClick={() => selectConversation(conv)}
+                        onClick={() =>
+                          selectConversation(conv)
+                        }
                         className={`flex flex-1 flex-col px-3 py-2.5 text-start ${
-                          isActive ? "text-[#B8860B] font-semibold" : "text-[#1A1A1A]/75"
+                          isActive
+                            ? "font-semibold text-[#B8860B]"
+                            : "text-[#1A1A1A]/75"
                         }`}
                       >
-                        <span className="truncate text-xs font-medium pr-6">
+                        <span className="truncate pr-6 text-xs font-medium">
                           {conv.title}
                         </span>
+
                         <span className="mt-0.5 text-[10px] text-[#1A1A1A]/35">
-                          {new Date(conv.created_at).toLocaleDateString()}
+                          {new Date(
+                            conv.created_at
+                          ).toLocaleDateString()}
                         </span>
                       </button>
 
-                      {/* Delete button — visible on hover */}
+                      {/* Delete button */}
                       <button
                         type="button"
-                        onClick={(e) => handleDeleteConversation(e, conv.id)}
-                        title="Delete chat"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 hidden h-6 w-6 items-center justify-center rounded-md text-[#1A1A1A]/30 transition hover:bg-red-100 hover:text-red-600 group-hover:flex"
+                        onClick={(e) =>
+                          requestDeleteConversation(
+                            e,
+                            conv.id
+                          )
+                        }
+                        title={t.delete}
+                        aria-label={t.delete}
+                        className="absolute right-2 top-1/2 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[#1A1A1A]/30 transition hover:bg-red-100 hover:text-red-600 group-hover:flex"
                       >
-                        🗑
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          className="h-4 w-4"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 6h18"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 6l-.7 13.1A2 2 0 0 1 16.3 21H7.7a2 2 0 0 1-2-1.9L5 6"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M10 10v7M14 10v7"
+                          />
+                        </svg>
                       </button>
                     </div>
                   );
@@ -398,32 +543,11 @@ export default function ChatPage() {
               )}
             </div>
           </div>
-
-          <div className="mt-4 border-t border-[#1A1A1A]/10 pt-4">
-            <div className="rounded-2xl border border-[#B8860B]/20 bg-[#B8860B]/[0.06] p-4">
-              <p className="text-xs font-semibold text-[#96700A]">
-                Pilot program
-              </p>
-
-              <p className="mt-1.5 text-xs leading-5 text-[#1A1A1A]/55">
-                Bring HerAI to your organization or cohort.
-              </p>
-
-              <a
-                href={pilotFormUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2.5 inline-flex text-xs font-semibold text-[#96700A] hover:underline"
-              >
-                Run a pilot →
-              </a>
-            </div>
-          </div>
         </aside>
 
         {/* Chat Area */}
         <section className="flex min-w-0 flex-1 flex-col">
-          {/* Mobile history / new chat bar */}
+          {/* Mobile New Chat Bar */}
           <div className="flex items-center justify-between border-b border-[#1A1A1A]/10 px-4 py-3 lg:hidden">
             <span className="text-xs font-medium text-[#1A1A1A]/45">
               HerAI · {t.country[country]}
@@ -439,7 +563,7 @@ export default function ChatPage() {
           </div>
 
           <div className="flex flex-1 flex-col">
-            {/* Empty state */}
+            {/* Empty State */}
             {!hasMessages ? (
               <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-12 sm:px-8">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1A1A1A] text-xl font-semibold text-white shadow-lg shadow-[#1A1A1A]/10">
@@ -455,25 +579,37 @@ export default function ChatPage() {
                 </p>
 
                 <div className="mt-9 grid w-full max-w-2xl gap-3 sm:grid-cols-2">
-                  {suggestions.map((suggestion) => (
-                    <button
-                      key={suggestion.label}
-                      type="button"
-                      onClick={() => sendMessage(suggestion.value)}
-                      dir={lang === "ar" ? "rtl" : "ltr"}
-                      className="group rounded-2xl border border-[#1A1A1A]/10 bg-white p-4 text-start transition hover:-translate-y-0.5 hover:border-[#B8860B]/35 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-medium">
-                          {suggestion.label}
-                        </span>
+                  {suggestions.map(
+                    (suggestion) => (
+                      <button
+                        key={suggestion.label}
+                        type="button"
+                        onClick={() =>
+                          sendMessage(
+                            suggestion.value
+                          )
+                        }
+                        dir={
+                          lang === "ar"
+                            ? "rtl"
+                            : "ltr"
+                        }
+                        className="group rounded-2xl border border-[#1A1A1A]/10 bg-white p-4 text-start transition hover:-translate-y-0.5 hover:border-[#B8860B]/35 hover:shadow-md"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium">
+                            {suggestion.label}
+                          </span>
 
-                        <span className="text-[#1A1A1A]/20 transition group-hover:text-[#B8860B]">
-                          {lang === "ar" ? "←" : "→"}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+                          <span className="text-[#1A1A1A]/20 transition group-hover:text-[#B8860B]">
+                            {lang === "ar"
+                              ? "←"
+                              : "→"}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
             ) : (
@@ -490,7 +626,8 @@ export default function ChatPage() {
                           : "justify-start"
                       }`}
                     >
-                      {message.role === "assistant" ? (
+                      {message.role ===
+                      "assistant" ? (
                         <div className="flex max-w-[88%] items-start gap-3 sm:max-w-[80%]">
                           <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#1A1A1A] text-[11px] font-bold text-white">
                             H
@@ -498,8 +635,12 @@ export default function ChatPage() {
 
                           <div>
                             <div
-                              dir={lang === "ar" ? "rtl" : "ltr"}
-                              className={`rounded-2xl border border-[#1A1A1A]/10 bg-white px-4 py-3.5 text-sm leading-7 shadow-sm whitespace-pre-wrap ${
+                              dir={
+                                lang === "ar"
+                                  ? "rtl"
+                                  : "ltr"
+                              }
+                              className={`whitespace-pre-wrap rounded-2xl border border-[#1A1A1A]/10 bg-white px-4 py-3.5 text-sm leading-7 shadow-sm ${
                                 lang === "ar"
                                   ? "rounded-bl-sm text-right"
                                   : "rounded-bl-sm text-left"
@@ -518,8 +659,12 @@ export default function ChatPage() {
                         </div>
                       ) : (
                         <div
-                          dir={lang === "ar" ? "rtl" : "ltr"}
-                          className={`max-w-[82%] rounded-2xl bg-[#1A1A1A] px-4 py-3.5 text-sm leading-7 text-white shadow-sm sm:max-w-[72%] whitespace-pre-wrap ${
+                          dir={
+                            lang === "ar"
+                              ? "rtl"
+                              : "ltr"
+                          }
+                          className={`max-w-[82%] whitespace-pre-wrap rounded-2xl bg-[#1A1A1A] px-4 py-3.5 text-sm leading-7 text-white shadow-sm sm:max-w-[72%] ${
                             lang === "ar"
                               ? "rounded-br-sm text-right"
                               : "rounded-br-sm text-left"
@@ -561,16 +706,26 @@ export default function ChatPage() {
               <div className="mx-auto max-w-3xl">
                 <form onSubmit={handleSubmit}>
                   <div
-                    dir={lang === "ar" ? "rtl" : "ltr"}
+                    dir={
+                      lang === "ar"
+                        ? "rtl"
+                        : "ltr"
+                    }
                     className="relative rounded-3xl border border-[#1A1A1A]/15 bg-white p-2 shadow-lg shadow-[#1A1A1A]/5 focus-within:border-[#B8860B]/50"
                   >
                     <textarea
                       ref={textareaRef}
                       value={input}
-                      onChange={(event) => setInput(event.target.value)}
+                      onChange={(event) =>
+                        setInput(event.target.value)
+                      }
                       onKeyDown={handleKeyDown}
                       rows={1}
-                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      dir={
+                        lang === "ar"
+                          ? "rtl"
+                          : "ltr"
+                      }
                       placeholder={t.placeholder}
                       disabled={isTyping}
                       className={`max-h-40 min-h-12 w-full resize-none bg-transparent py-3 text-sm leading-6 outline-none placeholder:text-[#1A1A1A]/30 disabled:cursor-not-allowed ${
@@ -582,20 +737,31 @@ export default function ChatPage() {
 
                     <button
                       type="submit"
-                      disabled={!input.trim() || isTyping}
+                      disabled={
+                        !input.trim() ||
+                        isTyping
+                      }
                       aria-label={t.send}
                       className={`absolute bottom-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#B8860B] text-white transition hover:bg-[#96700A] disabled:cursor-not-allowed disabled:bg-[#B8860B]/25 ${
-                        lang === "ar" ? "left-2.5" : "right-2.5"
+                        lang === "ar"
+                          ? "left-2.5"
+                          : "right-2.5"
                       }`}
                     >
-                      <span className="text-sm">↑</span>
+                      <span className="text-sm">
+                        ↑
+                      </span>
                     </button>
                   </div>
                 </form>
 
                 <div className="mt-3 flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-start">
                   <p
-                    dir={lang === "ar" ? "rtl" : "ltr"}
+                    dir={
+                      lang === "ar"
+                        ? "rtl"
+                        : "ltr"
+                    }
                     className="text-[10px] leading-5 text-[#1A1A1A]/35"
                   >
                     {t.safety}
@@ -613,6 +779,110 @@ export default function ChatPage() {
           </div>
         </section>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteTargetId && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1A1A1A]/40 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+          onMouseDown={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              !isDeleting
+            ) {
+              setDeleteTargetId(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[#1A1A1A]/10 bg-[#FBF7EC] shadow-2xl"
+            onMouseDown={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="p-6 sm:p-7">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-5 w-5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v4"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 17h.01"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M10.3 4.6 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.6a2 2 0 0 0-3.4 0Z"
+                    />
+                  </svg>
+                </div>
+
+                <div className="min-w-0">
+                  <h2
+                    id="delete-dialog-title"
+                    className="text-lg font-semibold tracking-tight"
+                  >
+                    {t.deleteTitle}
+                  </h2>
+
+                  <p
+                    dir={
+                      lang === "ar"
+                        ? "rtl"
+                        : "ltr"
+                    }
+                    className="mt-2 text-sm leading-6 text-[#1A1A1A]/55"
+                  >
+                    {t.deleteMessage}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className={`flex gap-3 border-t border-[#1A1A1A]/10 bg-white/60 p-4 ${
+                lang === "ar"
+                  ? "flex-row-reverse"
+                  : "flex-row justify-end"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={cancelDelete}
+                disabled={isDeleting}
+                className="rounded-xl border border-[#1A1A1A]/10 bg-white px-5 py-2.5 text-sm font-semibold text-[#1A1A1A]/70 transition hover:bg-[#1A1A1A]/5 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t.cancel}
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmDeleteConversation}
+                disabled={isDeleting}
+                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting
+                  ? t.deleting
+                  : t.delete}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
