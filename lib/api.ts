@@ -7,11 +7,21 @@ export type ChatRequest = {
   persona?: string;
   domain_scope?: string;
   language?: string;
+
+  // If provided, the message is added to this existing conversation.
+  // If omitted/null, the backend creates a new conversation.
+  conversation_id?: string | null;
 };
 
 export type ChatResponse = {
   response: string;
-  safety_flag: "safe" | "adjust" | "block";
+
+  // Returned by the backend so the frontend knows which
+  // conversation this message belongs to.
+  conversation_id?: string | null;
+
+  safety_flag?: "safe" | "adjust" | "block";
+
   verdict?: {
     action: "safe" | "adjust" | "block";
     bias_score: number;
@@ -69,18 +79,22 @@ export type ConversationSummary = {
 export async function getConversations(
   accessToken: string
 ): Promise<ConversationSummary[]> {
-  const response = await fetch(`${API_URL}/api/chat/conversations`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetch(
+    `${API_URL}/api/chat/conversations`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 
   if (!response.ok) {
     return [];
   }
 
   const data = await response.json();
+
   return data.conversations || [];
 }
 
@@ -88,30 +102,61 @@ export async function deleteConversation(
   id: string,
   accessToken: string
 ): Promise<boolean> {
-  const response = await fetch(`${API_URL}/api/chat/conversations/${id}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetch(
+    `${API_URL}/api/chat/conversations/${id}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
   return response.ok;
 }
 
 export async function getChatHistory(
   accessToken: string
 ): Promise<ChatHistoryMessage[]> {
-  const response = await fetch(`${API_URL}/api/chat/history`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetch(
+    `${API_URL}/api/chat/history`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 
   if (!response.ok) {
     return [];
   }
 
   const data = await response.json();
+
+  return data.messages || [];
+}
+
+export async function getConversationMessages(
+  conversationId: string,
+  accessToken: string
+): Promise<ChatHistoryMessage[]> {
+  const response = await fetch(
+    `${API_URL}/api/chat/conversations/${conversationId}/messages`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = await response.json();
+
   return data.messages || [];
 }
 
@@ -127,9 +172,11 @@ export async function getCouncilMembers(
   statusFilter?: string
 ): Promise<CouncilMember[]> {
   let url = `${API_URL}/api/council/members`;
+
   if (statusFilter) {
     url += `?status=${statusFilter}`;
   }
+
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -138,7 +185,9 @@ export async function getCouncilMembers(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to fetch council members");
+    throw new Error(
+      "Failed to fetch council members"
+    );
   }
 
   return response.json();
@@ -159,7 +208,9 @@ export async function approveCouncilMember(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to approve council member");
+    throw new Error(
+      "Failed to approve council member"
+    );
   }
 
   return response.json();
@@ -180,7 +231,9 @@ export async function rejectCouncilMember(
   );
 
   if (!response.ok) {
-    throw new Error("Failed to reject council member");
+    throw new Error(
+      "Failed to reject council member"
+    );
   }
 
   return response.json();
@@ -189,20 +242,31 @@ export async function rejectCouncilMember(
 export async function applyForCouncil(
   accessToken: string
 ): Promise<CouncilMember> {
-  const response = await fetch(`${API_URL}/api/council/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetch(
+    `${API_URL}/api/council/register`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 
   if (!response.ok) {
-    let msg = "Failed to submit council application";
+    let msg =
+      "Failed to submit council application";
+
     try {
       const err = await response.json();
-      if (err.error) msg = err.error;
-    } catch {}
+
+      if (err.error) {
+        msg = err.error;
+      }
+    } catch {
+      // Ignore JSON parsing errors.
+    }
+
     throw new Error(msg);
   }
 
@@ -213,17 +277,21 @@ export async function getCouncilStatus(
   userId: string,
   accessToken: string
 ): Promise<CouncilMember | null> {
-  const response = await fetch(`${API_URL}/api/council/members/${userId}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetch(
+    `${API_URL}/api/council/members/${userId}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 
   if (!response.ok) {
     return null;
   }
 
   const data = await response.json();
+
   return data.status || null;
 }
