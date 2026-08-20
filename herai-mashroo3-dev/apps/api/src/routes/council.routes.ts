@@ -98,7 +98,7 @@ router.post('/rules', authMiddleware, councilMiddleware, async (req: ServiceRequ
       domain: domain || null,
       region_code: region_code || null,
       created_by: req.user?.id,
-      is_active: true,
+      is_active: false,  // Rules must NOT be active immediately — governance lifecycle required
     }]).select().single()
 
     if (error) throw error

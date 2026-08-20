@@ -99,7 +99,10 @@ export async function handleChatLogic(input: ChatInput, deps: { supabase: any; o
     console.warn('persist warning', e)
   }
 
-  return { response: finalResponse, safety_flag: verdict.action, verdict }
+  // Only return the final user-facing response.
+  // Internal Safety Brain data (verdict, bias_score, risk_score, draft_response,
+  // matched_rule_ids) must NOT cross the API boundary.
+  return { response: finalResponse }
 }
 
 export default { handleChatLogic }
