@@ -1,4 +1,4 @@
-import { generateDraft, evaluateSafety } from './ai.service'
+import { generateDraft, evaluateSafety, fetchActiveCouncilRules, CouncilRule } from './ai.service'
 import { scrub } from './scrub.service'
 import { getRegionConfig } from './region.service'
 
@@ -25,8 +25,7 @@ export async function handleChatLogic(
   const { supabase, openaiKey } = deps
 
   const regionCode = input.region_code || 'EG'
-  const domainScope =
-    input.domain_scope || undefined
+  const domainScope = input.domain_scope || undefined
 
   // 1. Resolve Region Config
   const regionConfig = getRegionConfig(regionCode)
@@ -37,10 +36,18 @@ export async function handleChatLogic(
 
   let finalResponse = ''
   let verdict: any = null
+  let escalationData: any = null
   const verdictsToSave: any[] = []
 
   // Wrap AI calls in try/catch.
   try {
+    // 2.5 Fetch active Council rules for region and domain
+    const activeRules: CouncilRule[] = await fetchActiveCouncilRules(
+      supabase,
+      domainScope,
+      regionCode
+    )
+
     // 3. Generate initial draft
     let draft = await generateDraft(
       {
@@ -49,23 +56,33 @@ export async function handleChatLogic(
         persona: input.persona,
         domain: domainScope,
         language: input.language,
+        activeRules,
         supabase,
       },
       openaiKey
     )
 
-    // 4. Safety evaluation
+    // 4. Safety evaluation with real active rules
     verdict = await evaluateSafety(
-      draft,
+      {
+        draft,
+        rules: activeRules,
+        region: regionCode,
+        domain: domainScope,
+      },
       openaiKey
     )
 
     verdict.draft_response = draft
 
-    verdictsToSave.push(verdict)
-
     // 5. ADJUST Re-check Flow
     if (verdict.action === 'adjust') {
+      // Record the pre-adjustment verdict with final_response = null for audit integrity
+      verdictsToSave.push({
+        ...verdict,
+        final_response: null,
+      })
+
       draft = await generateDraft(
         {
           message: scrubbed,
@@ -73,35 +90,54 @@ export async function handleChatLogic(
           persona: input.persona,
           domain: domainScope,
           language: input.language,
+          activeRules,
           supabase,
           adjustmentInstruction:
-            'Ensure the response completely avoids any biased or high-risk language.',
+            'Ensure the response strictly adheres to safety rules and avoids any biased or prohibited language.',
         },
         openaiKey
       )
 
       verdict = await evaluateSafety(
-        draft,
+        {
+          draft,
+          rules: activeRules,
+          region: regionCode,
+          domain: domainScope,
+        },
         openaiKey
       )
 
       verdict.draft_response = draft
-
-      verdictsToSave.push(verdict)
+      verdictsToSave.push({
+        ...verdict,
+        final_response: draft,
+      })
+    } else {
+      verdictsToSave.push({
+        ...verdict,
+        final_response: draft,
+      })
     }
 
     finalResponse = draft
 
-    // 6. Handle BLOCK
+    // 6. Handle BLOCK & Escalation Path
     if (verdict.action === 'block') {
       finalResponse =
-        'I cannot provide a response to that request due to safety policies.'
+        input.language === 'ar'
+          ? 'عذراً، لا يمكنني تقديم إجابة على هذا الطلب نظراً لسياسات الأمان والحوكمة. يمكنك التواصل مع المنسق الإقليمي أو فريق الدعم للمساعدة.'
+          : 'I cannot provide a response to that request due to safety policies. You can connect with a regional coordinator or support team for assistance.'
+
+      escalationData = {
+        escalation_required: true,
+        reason: 'SAFETY_POLICY_VIOLATION',
+        matched_rules: verdict.matched_rule_ids || [],
+        support_contact: 'support@herai.org',
+      }
     }
   } catch (err) {
-    console.error(
-      'AI pipeline error:',
-      err
-    )
+    console.error('AI pipeline error:', err)
 
     verdict = {
       action: 'block',
@@ -112,27 +148,29 @@ export async function handleChatLogic(
     }
 
     finalResponse =
-      'I cannot provide a response to that request due to safety policies.'
+      input.language === 'ar'
+        ? 'عذراً، حدث خطأ أثناء معالجة طلبك. يمكنك التواصل مع فريق الدعم.'
+        : 'I cannot provide a response to that request due to safety policies.'
 
-    verdictsToSave.push(verdict)
+    escalationData = {
+      escalation_required: true,
+      reason: 'PIPELINE_ERROR',
+      matched_rules: [],
+      support_contact: 'support@herai.org',
+    }
+
+    verdictsToSave.push({
+      ...verdict,
+      final_response: finalResponse,
+    })
   }
 
   /*
    * ============================================================
    * 7. PERSIST CONVERSATION
    * ============================================================
-   *
-   * THIS IS THE IMPORTANT FIX.
-   *
-   * If conversation_id exists:
-   *   -> use the existing conversation.
-   *
-   * If conversation_id does NOT exist:
-   *   -> create a new conversation.
    */
-
-  let conversationId =
-    input.conversation_id || null
+  let conversationId = input.conversation_id || null
 
   try {
     if (conversationId) {
@@ -147,75 +185,60 @@ export async function handleChatLogic(
         .eq('user_id', input.user_id)
         .single()
 
-      if (
-        existingConversationError ||
-        !existingConversation
-      ) {
-        throw new Error(
-          'Conversation not found or does not belong to this user'
+      if (existingConversationError || !existingConversation) {
+        console.warn(
+          'Existing conversation not found or access denied, creating a new conversation row instead.'
         )
+        conversationId = null
       }
-    } else {
-      // FIRST MESSAGE OF A NEW CHAT.
-      // Only here do we create a new conversation.
+    }
+
+    // If there is no existing conversation, create one now.
+    if (!conversationId) {
       const {
-        data: conversationData,
-        error: convError,
+        data: newConversation,
+        error: newConversationError,
       } = await supabase
         .from('conversations')
         .insert([
           {
             user_id: input.user_id,
             region_code: regionCode,
-            region_config_version:
-              configVersion,
-            domain_scope:
-              domainScope || null,
+            region_config_version: configVersion,
+            domain_scope: domainScope,
             scrubbed_message: scrubbed,
           },
         ])
-        .select()
+        .select('id')
         .single()
 
-      if (convError) {
-        throw convError
+      if (newConversationError) {
+        throw newConversationError
       }
 
-      conversationId =
-        conversationData.id
+      conversationId = newConversation.id
     }
 
     /*
-     * For an existing conversation, we DO NOT insert another
-     * conversation row.
+     * 8. SAVE VERDICT AUDIT RECORDS
      *
-     * The original first message stays in:
-     * conversations.scrubbed_message
-     *
-     * Each new assistant response is stored in verdicts
-     * using the same conversation_id.
+     * Intermediate records maintain their pre-adjustment state (final_response = null)
+     * The delivered final record gets the actual finalResponse.
      */
-
-    const verdictsRecords =
-      verdictsToSave.map((v) => ({
-        conversation_id: conversationId,
-        action: v.action,
-        bias_score: v.bias_score,
-        risk_score: v.risk_score,
-        matched_rule_ids:
-          v.matched_rule_ids,
-        region_config_version:
-          configVersion,
-        draft_response:
-          v.draft_response,
-        final_response:
-          finalResponse,
-      }))
+    const verdictsRecords = verdictsToSave.map((v, index) => ({
+      conversation_id: conversationId,
+      action: v.action,
+      bias_score: v.bias_score,
+      risk_score: v.risk_score,
+      matched_rule_ids: v.matched_rule_ids || [],
+      region_config_version: configVersion,
+      draft_response: v.draft_response,
+      final_response:
+        index === verdictsToSave.length - 1 ? finalResponse : v.final_response,
+    }))
 
     if (verdictsRecords.length > 0) {
-      const {
-        error: verdictError,
-      } = await supabase
+      const { error: verdictError } = await supabase
         .from('verdicts')
         .insert(verdictsRecords)
 
@@ -224,21 +247,24 @@ export async function handleChatLogic(
       }
     }
   } catch (e) {
-    console.warn(
-      'persist warning',
-      e
-    )
+    console.warn('persist warning', e)
   }
 
   /*
-   * Return the conversation ID to the frontend.
-   *
-   * The frontend needs this ID so that the next message
-   * can continue the same conversation.
+   * Contract-compliant response (api-contract.md + safety-contract.md)
    */
   return {
     response: finalResponse,
     conversation_id: conversationId,
+    safety_flag: verdict?.action || 'safe',
+    verdict: {
+      action: verdict?.action || 'safe',
+      bias_score: verdict?.bias_score ?? 0,
+      risk_score: verdict?.risk_score ?? 0,
+      matched_rule_ids: verdict?.matched_rule_ids || [],
+    },
+    matched_rule_ids: verdict?.matched_rule_ids || [],
+    ...(escalationData ? { escalation: escalationData } : {}),
   }
 }
 
