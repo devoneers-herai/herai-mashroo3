@@ -38,7 +38,7 @@ const content = {
 
   ar: {
     brand: "HerAI Mashroo3",
-    back: "← العودة للرئيسية",
+    back: "العودة للرئيسية ←",
     title: "أهلًا بيكي تاني",
     subtitle:
       "سجّلي الدخول لحساب HerAI بتاعك وكمّلي الحصول على إرشاد عملي لشغلك.",
@@ -67,6 +67,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   const [lang, setLang] = useState<Lang>("en");
+  const [languageReady, setLanguageReady] = useState(false);
 
   const [form, setForm] = useState({
     email: "",
@@ -78,10 +79,38 @@ export default function LoginPage() {
 
   const t = content[lang];
 
+  /*
+   * Load the language that was previously selected.
+   */
   useEffect(() => {
+    const storedLanguage = localStorage.getItem("herai_language");
+
+    if (storedLanguage === "ar" || storedLanguage === "en") {
+      setLang(storedLanguage);
+    }
+
+    setLanguageReady(true);
+  }, []);
+
+  /*
+   * Keep the language preference, HTML language, and direction
+   * synchronized whenever the user changes the language.
+   */
+  useEffect(() => {
+    if (!languageReady) return;
+
+    localStorage.setItem("herai_language", lang);
+
     document.documentElement.lang = lang;
-    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
-  }, [lang]);
+    document.documentElement.dir =
+      lang === "ar" ? "rtl" : "ltr";
+  }, [lang, languageReady]);
+
+  function toggleLanguage() {
+    setLang((currentLang) =>
+      currentLang === "en" ? "ar" : "en"
+    );
+  }
 
   function updateField(
     field: keyof typeof form,
@@ -131,6 +160,20 @@ export default function LoginPage() {
       }
 
       /*
+       * IMPORTANT:
+       * Save the exact language used during login.
+       * The Profile page reads this value.
+       */
+      localStorage.setItem(
+        "herai_language",
+        lang
+      );
+
+      document.documentElement.lang = lang;
+      document.documentElement.dir =
+        lang === "ar" ? "rtl" : "ltr";
+
+      /*
        * Store the authentication session.
        */
       if (data?.session?.access_token) {
@@ -159,7 +202,8 @@ export default function LoginPage() {
 
       /*
        * Login successful.
-       * Send the user to their profile.
+       * The selected language has already been saved,
+       * so Profile can display in the same language.
        */
       router.push("/profile");
     } catch (err) {
@@ -174,9 +218,11 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#FBF7EC] px-4 py-8 text-[#1A1A1A] sm:px-8">
+    <main
+      dir={lang === "ar" ? "rtl" : "ltr"}
+      className="min-h-screen bg-[#FBF7EC] px-4 py-8 text-[#1A1A1A] sm:px-8"
+    >
       <div className="mx-auto max-w-5xl">
-
         {/* TOP BAR */}
         <div className="flex items-center justify-between">
           <Link
@@ -188,9 +234,7 @@ export default function LoginPage() {
 
           <button
             type="button"
-            onClick={() =>
-              setLang(lang === "en" ? "ar" : "en")
-            }
+            onClick={toggleLanguage}
             className="rounded-full border border-[#1A1A1A]/15 bg-white px-4 py-2 text-xs font-medium transition hover:border-[#B8860B]/50"
           >
             {lang === "en" ? "عربي" : "EN"}
@@ -199,7 +243,6 @@ export default function LoginPage() {
 
         {/* PAGE CONTENT */}
         <div className="mx-auto max-w-2xl py-12 sm:py-16">
-
           <div className="mb-8 text-center">
             <Link
               href="/"
@@ -219,12 +262,10 @@ export default function LoginPage() {
 
           {/* FORM CARD */}
           <div className="rounded-[2rem] border border-[#1A1A1A]/10 bg-white p-6 shadow-xl shadow-[#1A1A1A]/5 sm:p-10">
-
             <form
               onSubmit={handleSubmit}
               className="space-y-5"
             >
-
               {/* EMAIL */}
               <div>
                 <label className="mb-2 block text-sm font-semibold">
@@ -243,6 +284,7 @@ export default function LoginPage() {
                   placeholder={t.placeholders.email}
                   required
                   autoComplete="email"
+                  dir="ltr"
                   className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition placeholder:text-[#1A1A1A]/30 focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
                 />
               </div>
@@ -265,6 +307,7 @@ export default function LoginPage() {
                   placeholder={t.placeholders.password}
                   required
                   autoComplete="current-password"
+                  dir="ltr"
                   className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition placeholder:text-[#1A1A1A]/30 focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
                 />
               </div>
@@ -285,7 +328,9 @@ export default function LoginPage() {
                 disabled={loading}
                 className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#B8860B] px-7 text-sm font-semibold text-white shadow-md transition hover:bg-[#96700A] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? t.loggingIn : t.button}
+                {loading
+                  ? t.loggingIn
+                  : t.button}
               </button>
             </form>
 

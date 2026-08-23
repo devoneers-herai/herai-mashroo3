@@ -5,8 +5,7 @@ import { useEffect, useState } from "react";
 type Lang = "en" | "ar";
 type Country = "LB" | "EG";
 
-const PILOT_FORM_URL =
-  "https://docs.google.com/forms/d/e/1FAIpQLSc3VlgXHo7Uohw5n07HXfDxr012KoWiLzkBnLyfkAEWh7xt_g/viewform";
+
 
 const content = {
   en: {
@@ -16,6 +15,7 @@ const content = {
 
       nav: {
         demo: "Demo",
+        voice: "Voice mode",
         safety: "Safety",
         who: "Who it's for",
         org: "Organizations",
@@ -37,6 +37,7 @@ const content = {
         "✓ Local context",
         "✓ Safety-aware",
         "✓ Built for real businesses",
+        "✓ Voice-enabled",
       ],
 
       demoHeading: "Ask HerAI a real business question.",
@@ -56,6 +57,42 @@ const content = {
       send: "Send",
 
       previewNote: "Preview only — not a live conversation.",
+
+      voiceLabel: "Voice mode",
+      voiceHeading: "Speak your question. Let HerAI answer out loud.",
+      voiceSub:
+        "When typing isn't convenient, just talk. Ask your business question naturally, listen as HerAI responds, and replay the guidance whenever you need it.",
+
+      voiceFeatures: [
+        {
+          icon: "🎙️",
+          title: "Just speak",
+          desc: "Ask a question naturally without stopping to type.",
+        },
+        {
+          icon: "🗣️",
+          title: "Hear the guidance",
+          desc: "HerAI can respond aloud so you can listen while you work.",
+        },
+        {
+          icon: "↻",
+          title: "Replay when needed",
+          desc: "Listen again to important advice whenever you're ready.",
+        },
+      ],
+
+      voicePreview: {
+        listening: "Listening to your voice...",
+        prompt: "Try saying:",
+        userSpeech:
+          "I have more orders than I can finish this week. What should I do?",
+        aiSpeaking: "HerAI is answering aloud",
+        aiSpeech:
+          "Let's start by looking at your current orders, how much you can realistically produce, and which customers need to be contacted first.",
+        stop: "Stop",
+        replay: "Replay",
+        voiceNote: "Voice preview — speak, listen, replay",
+      },
 
       safetyLabel: "Built differently",
       safetyHeading: "Built with safety in mind.",
@@ -98,8 +135,6 @@ const content = {
 
       trust:
         "Built for real-world use with women, organizations, and local contexts in mind.",
-
-      footer: "A DEVONEERS initiative",
     },
 
     EG: {
@@ -108,6 +143,7 @@ const content = {
 
       nav: {
         demo: "Demo",
+        voice: "Voice mode",
         safety: "Safety",
         who: "Who it's for",
         org: "Organizations",
@@ -129,6 +165,7 @@ const content = {
         "✓ Local context",
         "✓ Safety-aware",
         "✓ Built for real businesses",
+        "✓ Voice-enabled",
       ],
 
       demoHeading: "Ask HerAI a real business question.",
@@ -148,6 +185,42 @@ const content = {
       send: "Send",
 
       previewNote: "Preview only — not a live conversation.",
+
+      voiceLabel: "Voice mode",
+      voiceHeading: "Speak your question. Let HerAI answer out loud.",
+      voiceSub:
+        "When typing isn't convenient, just talk. Ask your business question naturally, listen as HerAI responds, and replay the guidance whenever you need it.",
+
+      voiceFeatures: [
+        {
+          icon: "🎙️",
+          title: "Just speak",
+          desc: "Ask a question naturally without stopping to type.",
+        },
+        {
+          icon: "🗣️",
+          title: "Hear the guidance",
+          desc: "HerAI can respond aloud so you can listen while you work.",
+        },
+        {
+          icon: "↻",
+          title: "Replay when needed",
+          desc: "Listen again to important advice whenever you're ready.",
+        },
+      ],
+
+      voicePreview: {
+        listening: "Listening to your voice...",
+        prompt: "Try saying:",
+        userSpeech:
+          "I have more orders than I can finish this week. What should I do?",
+        aiSpeaking: "HerAI is answering aloud",
+        aiSpeech:
+          "Let's start by looking at your current orders, how much you can realistically produce, and which customers need to be contacted first.",
+        stop: "Stop",
+        replay: "Replay",
+        voiceNote: "Voice preview — speak, listen, replay",
+      },
 
       safetyLabel: "Built differently",
       safetyHeading: "Built with safety in mind.",
@@ -190,8 +263,6 @@ const content = {
 
       trust:
         "Built for real-world use with women, organizations, and local contexts in mind.",
-
-      footer: "A DEVONEERS initiative",
     },
   },
 
@@ -202,6 +273,7 @@ const content = {
 
       nav: {
         demo: "التجربة",
+        voice: "الوضع الصوتي",
         safety: "الأمان",
         who: "لمين هيدا؟",
         org: "المنظمات",
@@ -223,6 +295,7 @@ const content = {
         "✓ سياق محلي",
         "✓ أمان من الأساس",
         "✓ مصمم للأعمال الحقيقية",
+        "✓ وضع صوتي",
       ],
 
       demoHeading: "اسألي HerAI سؤال تجاري حقيقي.",
@@ -242,6 +315,42 @@ const content = {
       send: "إرسال",
 
       previewNote: "معاينة فقط — مش محادثة حقيقية.",
+
+      voiceLabel: "الوضع الصوتي",
+      voiceHeading: "احكي سؤالك. وخلي HerAI يجاوبك بصوت.",
+      voiceSub:
+        "لما ما يكون مناسب تكتبي، فيكي بس تحكي. اسألي سؤالك بطبيعتك، اسمعي جواب HerAI، وارجعي اسمعي الإرشادات بأي وقت بدك.",
+
+      voiceFeatures: [
+        {
+          icon: "🎙️",
+          title: "بس احكي",
+          desc: "اسألي سؤالك بطبيعتك من دون ما توقفي لتكتبي.",
+        },
+        {
+          icon: "🗣️",
+          title: "اسمعي الإرشاد",
+          desc: "HerAI فيو يجاوبك بصوت لتسمعي الإرشادات وإنتِ عم تشتغلي.",
+        },
+        {
+          icon: "↻",
+          title: "اسمعيه من جديد",
+          desc: "ارجعي اسمعي النصيحة المهمة بأي وقت تكوني جاهزة.",
+        },
+      ],
+
+      voicePreview: {
+        listening: "عم نسمع لصوتك...",
+        prompt: "جرّبي تقولي:",
+        userSpeech:
+          "عندي طلبات أكتر من اللي بقدر خلّصها هالأسبوع. شو بعمل؟",
+        aiSpeaking: "HerAI عم يجاوبك بصوت",
+        aiSpeech:
+          "خلّينا نبلّش نشوف الطلبات اللي عندك، وقديش فيكي تنتجي بشكل واقعي، وأي زباين لازم تتواصلي معن أول شي.",
+        stop: "إيقاف",
+        replay: "إعادة",
+        voiceNote: "معاينة صوتية — احكي، اسمعي، وكرّري",
+      },
 
       safetyLabel: "مختلفين بالطريقة اللي بنبني فيها",
       safetyHeading: "مصمّم مع الأمان من الأساس.",
@@ -284,8 +393,6 @@ const content = {
 
       trust:
         "مصمم للاستخدام الواقعي مع النساء، المنظمات، والسياقات المحلية.",
-
-      footer: "مبادرة من DEVONEERS",
     },
 
     EG: {
@@ -294,6 +401,7 @@ const content = {
 
       nav: {
         demo: "التجربة",
+        voice: "الوضع الصوتي",
         safety: "الأمان",
         who: "مين مناسب ليه؟",
         org: "المنظمات",
@@ -315,6 +423,7 @@ const content = {
         "✓ سياق محلي",
         "✓ أمان من الأساس",
         "✓ مصمم للأعمال الحقيقية",
+        "✓ وضع صوتي",
       ],
 
       demoHeading: "اسألي HerAI سؤال حقيقي عن شغلك.",
@@ -334,6 +443,42 @@ const content = {
       send: "إرسال",
 
       previewNote: "معاينة فقط — دي مش محادثة حقيقية.",
+
+      voiceLabel: "الوضع الصوتي",
+      voiceHeading: "قولي سؤالك. وخلي HerAI يرد بصوت.",
+      voiceSub:
+        "لما الكتابة ما تكونش مناسبة، اتكلمي بس. اسألي سؤالك بطبيعتك، اسمعي رد HerAI، وارجعي للرد تاني في أي وقت تحتاجيه.",
+
+      voiceFeatures: [
+        {
+          icon: "🎙️",
+          title: "اتكلمي بس",
+          desc: "اسألي سؤالك بطبيعتك من غير ما توقفي عشان تكتبي.",
+        },
+        {
+          icon: "🗣️",
+          title: "اسمعي الإرشاد",
+          desc: "HerAI يقدر يرد بصوت علشان تسمعي الإرشادات وإنتِ بتشتغلي.",
+        },
+        {
+          icon: "↻",
+          title: "اسمعيه تاني",
+          desc: "ارجعي اسمعي النصيحة المهمة في أي وقت تحتاجيها.",
+        },
+      ],
+
+      voicePreview: {
+        listening: "بسمع صوتك...",
+        prompt: "جربي تقولي:",
+        userSpeech:
+          "عندي طلبات أكتر من اللي أقدر أخلصها الأسبوع ده. أعمل إيه؟",
+        aiSpeaking: "HerAI بيرد بصوت",
+        aiSpeech:
+          "تعالي الأول نبص على الطلبات اللي عندك، وقد إيه تقدري تنتجي بشكل واقعي، ومين من العملاء محتاج تتواصلي معاه الأول.",
+        stop: "إيقاف",
+        replay: "إعادة",
+        voiceNote: "معاينة صوتية — اتكلمي، اسمعي، وكرري",
+      },
 
       safetyLabel: "مختلفين بالطريقة اللي بنبني بيها",
       safetyHeading: "الأمان جزء من التصميم من البداية.",
@@ -376,8 +521,6 @@ const content = {
 
       trust:
         "مصمم للاستخدام الحقيقي مع الستات، المنظمات، والسياقات المحلية.",
-
-      footer: "مبادرة من DEVONEERS",
     },
   },
 } as const;
@@ -398,8 +541,6 @@ export default function Home() {
       {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-[#1A1A1A]/10 bg-[#FBF7EC]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-8">
-
-          {/* BRAND */}
           <a
             href="#top"
             className="shrink-0 text-lg font-semibold tracking-tight"
@@ -407,44 +548,28 @@ export default function Home() {
             {t.brand}
           </a>
 
-          {/* NAVIGATION */}
           <nav
             aria-label={lang === "ar" ? "التنقل" : "Section navigation"}
-            className="hidden items-center gap-7 text-sm font-medium text-[#1A1A1A]/70 lg:flex"
+            className="hidden items-center gap-7 text-sm font-medium text-[#1A1A1A]/70 xl:flex"
           >
-            <a
-              href="#demo"
-              className="transition hover:text-[#1A1A1A]"
-            >
+            <a href="#demo" className="transition hover:text-[#1A1A1A]">
               {t.nav.demo}
             </a>
-
-            <a
-              href="#safety"
-              className="transition hover:text-[#1A1A1A]"
-            >
+            <a href="#voice" className="transition hover:text-[#1A1A1A]">
+              {t.nav.voice}
+            </a>
+            <a href="#safety" className="transition hover:text-[#1A1A1A]">
               {t.nav.safety}
             </a>
-
-            <a
-              href="#who"
-              className="transition hover:text-[#1A1A1A]"
-            >
+            <a href="#who" className="transition hover:text-[#1A1A1A]">
               {t.nav.who}
             </a>
-
-            <a
-              href="#pilot"
-              className="transition hover:text-[#1A1A1A]"
-            >
+            <a href="#pilot" className="transition hover:text-[#1A1A1A]">
               {t.nav.org}
             </a>
           </nav>
 
-          {/* CONTROLS */}
           <div className="flex items-center gap-2 sm:gap-3">
-
-            {/* COUNTRY SELECTOR */}
             <label className="relative">
               <span className="sr-only">
                 {lang === "ar" ? "اختيار الدولة" : "Select country"}
@@ -452,22 +577,18 @@ export default function Home() {
 
               <select
                 value={country}
-                onChange={(e) =>
-                  setCountry(e.target.value as Country)
-                }
+                onChange={(e) => setCountry(e.target.value as Country)}
                 className="h-9 cursor-pointer appearance-none rounded-full border border-[#1A1A1A]/15 bg-white py-1 pl-3 pr-8 text-xs font-medium outline-none transition hover:border-[#B8860B]/50 focus:border-[#B8860B]"
               >
                 <option value="LB">
                   {lang === "ar" ? "🇱🇧 لبنان" : "🇱🇧 Lebanon"}
                 </option>
-
                 <option value="EG">
                   {lang === "ar" ? "🇪🇬 مصر" : "🇪🇬 Egypt"}
                 </option>
               </select>
             </label>
 
-            {/* LANGUAGE TOGGLE */}
             <div
               role="group"
               aria-label={lang === "ar" ? "اللغة" : "Language"}
@@ -500,7 +621,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* PILOT CTA */}
             <a
               href="/login"
               target="_blank"
@@ -514,15 +634,11 @@ export default function Home() {
       </header>
 
       <main id="top">
-
         {/* HERO */}
-        <section
-          className="relative overflow-hidden border-b border-[#1A1A1A]/10 px-4 py-24 sm:px-8 sm:py-32"
-        >
+        <section className="relative overflow-hidden border-b border-[#1A1A1A]/10 px-4 py-24 sm:px-8 sm:py-32">
           <div className="pointer-events-none absolute left-1/2 top-0 h-[500px] w-[700px] -translate-x-1/2 rounded-full bg-[#B8860B]/[0.07] blur-3xl" />
 
           <div className="relative mx-auto max-w-4xl text-center">
-
             <span className="inline-flex rounded-full border border-[#B8860B]/30 bg-[#B8860B]/10 px-4 py-2 text-xs font-semibold text-[#96700A]">
               {t.badge}
             </span>
@@ -536,7 +652,6 @@ export default function Home() {
             </p>
 
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-
               <a
                 href="/chat-demo"
                 className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#B8860B] px-7 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:bg-[#96700A]"
@@ -554,7 +669,6 @@ export default function Home() {
               </a>
             </div>
 
-            {/* PRODUCT SIGNALS */}
             <div
               dir={lang === "ar" ? "rtl" : "ltr"}
               className="mt-14 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-xs font-medium text-[#1A1A1A]/45"
@@ -573,8 +687,6 @@ export default function Home() {
         >
           <div className="mx-auto max-w-6xl">
             <div className="grid items-center gap-14 lg:grid-cols-[0.8fr_1.2fr]">
-
-              {/* DEMO TEXT */}
               <div>
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B8860B]">
                   HerAI
@@ -588,7 +700,6 @@ export default function Home() {
                   {t.demoSub}
                 </p>
 
-                {/* TOPIC PILLS */}
                 <div
                   dir={lang === "ar" ? "rtl" : "ltr"}
                   className="mt-7 flex flex-wrap gap-2"
@@ -604,10 +715,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* SINGLE CHAT PREVIEW */}
               <div className="overflow-hidden rounded-3xl border border-[#1A1A1A]/10 bg-white shadow-xl shadow-[#1A1A1A]/5">
-
-                {/* CHAT HEADER */}
                 <div
                   dir="ltr"
                   className="flex items-center border-b border-[#1A1A1A]/10 px-5 py-4"
@@ -627,23 +735,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* CHAT MESSAGES */}
-                {/*
-                  IMPORTANT:
-                  The outer chat is explicitly LTR.
-
-                  This means:
-                  justify-end   = physical RIGHT
-                  justify-start = physical LEFT
-
-                  The actual Arabic text gets its own RTL direction.
-                */}
-                <div
-                  dir="ltr"
-                  className="space-y-5 p-6 sm:p-8"
-                >
-
-                  {/* USER MESSAGE — ALWAYS PHYSICALLY RIGHT */}
+                <div dir="ltr" className="space-y-5 p-6 sm:p-8">
                   <div className="flex w-full justify-end">
                     <div
                       dir={lang === "ar" ? "rtl" : "ltr"}
@@ -653,7 +745,6 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* ASSISTANT MESSAGE — ALWAYS PHYSICALLY LEFT */}
                   <div className="flex w-full justify-start">
                     <div
                       dir={lang === "ar" ? "rtl" : "ltr"}
@@ -671,13 +762,8 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* CHAT INPUT PREVIEW */}
-                <div
-                  dir="ltr"
-                  className="border-t border-[#1A1A1A]/10 p-4"
-                >
+                <div dir="ltr" className="border-t border-[#1A1A1A]/10 p-4">
                   <div className="flex items-center gap-2 rounded-full border border-[#1A1A1A]/10 bg-[#1A1A1A]/[0.02] px-4 py-2.5">
-
                     <span
                       dir={lang === "ar" ? "rtl" : "ltr"}
                       className="flex-1 text-xs text-[#1A1A1A]/30"
@@ -686,11 +772,166 @@ export default function Home() {
                     </span>
 
                     <span
+                      aria-label="Voice mode"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#B8860B]/15 text-sm"
+                    >
+                      🎙️
+                    </span>
+
+                    <span
                       dir={lang === "ar" ? "rtl" : "ltr"}
-                      className="shrink-0 rounded-full bg-[#B8860B]/30 px-4 py-1.5 text-[10px] font-semibold text-white"
+                      className="shrink-0 rounded-full bg-[#B8860B] px-4 py-1.5 text-[10px] font-semibold text-white"
                     >
                       {t.send}
                     </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* VOICE MODE */}
+        <section
+          id="voice"
+          className="relative scroll-mt-24 overflow-hidden border-b border-[#1A1A1A]/10 bg-[#B8860B]/[0.035] px-4 py-24 sm:px-8"
+        >
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[420px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#B8860B]/[0.08] blur-3xl" />
+
+          <div className="relative mx-auto max-w-6xl">
+            <div className="grid items-center gap-14 lg:grid-cols-[0.9fr_1.1fr]">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B8860B]">
+                  {t.voiceLabel}
+                </span>
+
+                <h2 className="mt-4 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
+                  {t.voiceHeading}
+                </h2>
+
+                <p className="mt-5 max-w-xl leading-8 text-[#1A1A1A]/65">
+                  {t.voiceSub}
+                </p>
+
+                <div className="mt-10 space-y-4">
+                  {t.voiceFeatures.map((feature) => (
+                    <div
+                      key={feature.title}
+                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      className="flex gap-4 rounded-2xl border border-[#B8860B]/15 bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#B8860B]/30 hover:shadow-md"
+                    >
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#B8860B]/10 text-xl">
+                        {feature.icon}
+                      </div>
+
+                      <div>
+                        <h3 className="font-semibold">{feature.title}</h3>
+                        <p className="mt-1 text-sm leading-6 text-[#1A1A1A]/55">
+                          {feature.desc}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative overflow-hidden rounded-[2rem] border border-[#B8860B]/20 bg-white p-6 shadow-xl shadow-[#B8860B]/10 sm:p-8">
+                <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#B8860B]/15 blur-3xl" />
+
+                <div className="relative">
+                  <div
+                    dir={lang === "ar" ? "rtl" : "ltr"}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[#B8860B] text-lg text-white shadow-md">
+                        <span className="absolute inset-0 animate-ping rounded-full bg-[#B8860B]/25" />
+                        <span className="relative">🎙️</span>
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-semibold">HerAI</p>
+                        <p className="text-xs font-medium text-[#B8860B]">
+                          {t.voicePreview.listening}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex h-9 items-end gap-1">
+                      <span className="h-3 w-1 animate-pulse rounded-full bg-[#B8860B]" />
+                      <span className="h-6 w-1 animate-pulse rounded-full bg-[#B8860B]" />
+                      <span className="h-9 w-1 animate-pulse rounded-full bg-[#B8860B]" />
+                      <span className="h-5 w-1 animate-pulse rounded-full bg-[#B8860B]" />
+                      <span className="h-7 w-1 animate-pulse rounded-full bg-[#B8860B]" />
+                      <span className="h-3 w-1 animate-pulse rounded-full bg-[#B8860B]" />
+                    </div>
+                  </div>
+
+                  <div
+                    dir={lang === "ar" ? "rtl" : "ltr"}
+                    className="mt-8 rounded-2xl border border-[#B8860B]/15 bg-[#B8860B]/[0.05] p-4"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#B8860B]">
+                      {t.voicePreview.prompt}
+                    </p>
+
+                    <p className="mt-2 text-sm leading-7 text-[#1A1A1A]/75">
+                      “{t.voicePreview.userSpeech}”
+                    </p>
+                  </div>
+
+                  <div className="mt-6">
+                    <div
+                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      className="flex items-center gap-2"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#B8860B]/10 text-xs">
+                        🔊
+                      </div>
+
+                      <span className="text-xs font-semibold text-[#B8860B]">
+                        {t.voicePreview.aiSpeaking}
+                      </span>
+                    </div>
+
+                    <div
+                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      className="mt-3 rounded-2xl bg-[#F3F0E8] px-5 py-5 text-sm leading-7 text-[#1A1A1A]/80"
+                    >
+                      {t.voicePreview.aiSpeech}
+                    </div>
+
+                    <div
+                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      className="mt-5 flex items-center gap-3"
+                    >
+                      <button
+                        type="button"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#B8860B] text-sm text-white shadow-md transition hover:bg-[#96700A]"
+                        aria-label={t.voicePreview.stop}
+                      >
+                        ■
+                      </button>
+
+                      <div className="flex flex-1 items-center gap-1">
+                        <span className="h-1.5 flex-[0.65] rounded-full bg-[#B8860B]" />
+                        <span className="h-1.5 flex-[0.35] rounded-full bg-[#1A1A1A]/10" />
+                      </div>
+
+                      <button
+                        type="button"
+                        className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#1A1A1A]/10 bg-white px-3 text-[10px] font-semibold text-[#1A1A1A]/60 transition hover:border-[#B8860B]/40"
+                      >
+                        ↻ {t.voicePreview.replay}
+                      </button>
+                    </div>
+
+                    <p
+                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      className="mt-5 text-center text-[10px] font-medium text-[#1A1A1A]/35"
+                    >
+                      {t.voicePreview.voiceNote}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -704,9 +945,7 @@ export default function Home() {
           className="scroll-mt-24 border-b border-[#1A1A1A]/10 px-4 py-24 sm:px-8"
         >
           <div className="mx-auto max-w-6xl">
-
             <div className="mx-auto max-w-2xl text-center">
-
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B8860B]">
                 {t.safetyLabel}
               </span>
@@ -745,9 +984,7 @@ export default function Home() {
           className="scroll-mt-24 border-b border-[#1A1A1A]/10 px-4 py-24 sm:px-8"
         >
           <div className="mx-auto max-w-6xl">
-
             <div className="max-w-2xl">
-
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B8860B]">
                 {t.whoLabel}
               </span>
@@ -778,9 +1015,7 @@ export default function Home() {
                     </span>
                   </div>
 
-                  <h3 className="mt-6 font-semibold">
-                    {topic}
-                  </h3>
+                  <h3 className="mt-6 font-semibold">{topic}</h3>
 
                   <p className="mt-2 text-sm leading-6 text-[#1A1A1A]/55">
                     {note}
@@ -797,15 +1032,11 @@ export default function Home() {
           className="scroll-mt-24 px-4 py-24 sm:px-8"
         >
           <div className="mx-auto max-w-6xl">
-
             <div className="relative overflow-hidden rounded-[2rem] bg-[#1A1A1A] px-7 py-14 text-white sm:px-12 sm:py-16">
-
               <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-[#B8860B]/20 blur-3xl" />
 
               <div className="relative grid gap-10 lg:grid-cols-[1fr_auto] lg:items-center">
-
                 <div className="max-w-2xl">
-
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#D5A928]">
                     {t.orgLabel}
                   </span>
@@ -854,40 +1085,6 @@ export default function Home() {
           </div>
         </section>
       </main>
-
-      {/* FOOTER */}
-      <footer className="border-t border-[#1A1A1A]/10 px-4 py-8 sm:px-8">
-        <div
-          className={`mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-xs text-[#1A1A1A]/45 sm:flex-row ${
-            lang === "ar" ? "sm:text-right" : "sm:text-left"
-          }`}
-        >
-          <span>{t.footer}</span>
-
-          <div className="flex items-center gap-5">
-            <a
-              href="#demo"
-              className="transition hover:text-[#1A1A1A]"
-            >
-              {t.nav.demo}
-            </a>
-
-            <a
-              href="#safety"
-              className="transition hover:text-[#1A1A1A]"
-            >
-              {t.nav.safety}
-            </a>
-
-            <a
-              href="#pilot"
-              className="transition hover:text-[#1A1A1A]"
-            >
-              {t.nav.org}
-            </a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
