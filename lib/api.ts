@@ -160,11 +160,148 @@ export async function getConversationMessages(
   return data.messages || [];
 }
 
+export type UserProfile = {
+  id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  phone_number?: string;
+  age?: number;
+  domain?: string;
+  country?: string;
+  city?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type UpdateProfileInput = {
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  age?: number;
+  domain?: string;
+  country?: string;
+  city?: string;
+};
+
+export async function getUserProfile(
+  accessToken: string
+): Promise<UserProfile | null> {
+  const response = await fetch(`${API_URL}/api/auth/profile`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+  return data.profile || null;
+}
+
+export async function updateUserProfile(
+  input: UpdateProfileInput,
+  accessToken: string
+): Promise<UserProfile> {
+  const response = await fetch(`${API_URL}/api/auth/profile`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    let msg = "Failed to update profile";
+    try {
+      const err = await response.json();
+      if (err.error) msg = err.error;
+    } catch {}
+    throw new Error(msg);
+  }
+
+  const data = await response.json();
+  return data.profile;
+}
+
+export async function forgotPassword(
+  email: string
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    let msg = "Failed to request password reset";
+    try {
+      const err = await response.json();
+      if (err.error) msg = err.error;
+    } catch {}
+    throw new Error(msg);
+  }
+
+  return response.json();
+}
+
+export async function resetPassword(
+  password: string,
+  accessToken: string
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${API_URL}/api/auth/reset-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ password }),
+  });
+
+  if (!response.ok) {
+    let msg = "Failed to reset password";
+    try {
+      const err = await response.json();
+      if (err.error) msg = err.error;
+    } catch {}
+    throw new Error(msg);
+  }
+
+  return response.json();
+}
+
 export type CouncilMember = {
   id: string;
   user_id: string;
   status: "pending" | "approved" | "rejected";
   created_at: string;
+  motivation?: string;
+  experience?: string;
+  contribution?: string;
+  availability?: string;
+  user?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    domain?: string;
+    country?: string;
+    city?: string;
+    phone_number?: string;
+  };
+};
+
+export type CouncilApplicationPayload = {
+  motivation?: string;
+  experience?: string;
+  contribution?: string;
+  availability?: string;
+  agreement?: boolean;
 };
 
 export async function getCouncilMembers(
@@ -240,7 +377,8 @@ export async function rejectCouncilMember(
 }
 
 export async function applyForCouncil(
-  accessToken: string
+  accessToken: string,
+  applicationData?: CouncilApplicationPayload
 ): Promise<CouncilMember> {
   const response = await fetch(
     `${API_URL}/api/council/register`,
@@ -250,6 +388,7 @@ export async function applyForCouncil(
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
+      body: JSON.stringify(applicationData || {}),
     }
   );
 

@@ -31,6 +31,7 @@ const content = {
     loggingIn: "Logging in...",
     noAccount: "Don't have an account?",
     register: "Create an account",
+    forgotPassword: "Forgot password?",
 
     required: "Please enter your email and password.",
     genericError: "Something went wrong. Please try again.",
@@ -57,6 +58,7 @@ const content = {
     loggingIn: "جاري تسجيل الدخول...",
     noAccount: "لسه معندكيش حساب؟",
     register: "اعملي حساب",
+    forgotPassword: "نسيتِ كلمة المرور؟",
 
     required: "من فضلك اكتبي البريد الإلكتروني وكلمة المرور.",
     genericError: "حصلت مشكلة. حاولي مرة تانية.",
@@ -225,12 +227,9 @@ export default function LoginPage() {
       <div className="mx-auto max-w-5xl">
         {/* TOP BAR */}
         <div className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-lg font-semibold tracking-tight"
-          >
+          <span className="text-lg font-semibold tracking-tight cursor-default select-none">
             {t.brand}
-          </Link>
+          </span>
 
           <button
             type="button"
@@ -291,9 +290,18 @@ export default function LoginPage() {
 
               {/* PASSWORD */}
               <div>
-                <label className="mb-2 block text-sm font-semibold">
-                  {t.fields.password}
-                </label>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-sm font-semibold">
+                    {t.fields.password}
+                  </label>
+
+                  <Link
+                    href="/forgot-password"
+                    className="text-xs font-medium text-[#B8860B] transition hover:text-[#96700A]"
+                  >
+                    {t.forgotPassword}
+                  </Link>
+                </div>
 
                 <input
                   type="password"

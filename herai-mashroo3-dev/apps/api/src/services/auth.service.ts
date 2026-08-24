@@ -348,8 +348,150 @@ export async function verifyToken(
   return data.user.id
 }
 
+export async function getProfile(
+  userId: string,
+  supabase: SupabaseClient
+) {
+  if (!userId) {
+    throw new Error('User ID is required')
+  }
+
+  const cfg = getServerConfig()
+  const adminClient = createSupabaseClient(
+    cfg.SUPABASE_URL,
+    cfg.SUPABASE_SERVICE_ROLE_KEY
+  )
+
+  const { data, error } = await adminClient
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to fetch user profile: ${error.message}`)
+  }
+
+  return data
+}
+
+export type UpdateProfileInput = {
+  firstName?: string
+  lastName?: string
+  phoneNumber?: string
+  age?: number
+  domain?: string
+  country?: string
+  city?: string
+}
+
+export async function updateProfile(
+  userId: string,
+  input: UpdateProfileInput,
+  supabase: SupabaseClient
+) {
+  if (!userId) {
+    throw new Error('User ID is required')
+  }
+
+  const cfg = getServerConfig()
+  const adminClient = createSupabaseClient(
+    cfg.SUPABASE_URL,
+    cfg.SUPABASE_SERVICE_ROLE_KEY
+  )
+
+  const updateData: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (input.firstName !== undefined) updateData.first_name = input.firstName.trim()
+  if (input.lastName !== undefined) updateData.last_name = input.lastName.trim()
+  if (input.phoneNumber !== undefined) updateData.phone_number = input.phoneNumber.trim()
+  if (input.age !== undefined) updateData.age = input.age
+  if (input.domain !== undefined) updateData.domain = input.domain.trim()
+  if (input.country !== undefined) updateData.country = input.country.trim()
+  if (input.city !== undefined) updateData.city = input.city.trim()
+
+  const { data, error } = await adminClient
+    .from('users')
+    .update(updateData)
+    .eq('id', userId)
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to update user profile: ${error.message}`)
+  }
+
+  return data
+}
+
+export async function forgotPassword(
+  email: string,
+  supabase: SupabaseClient
+) {
+  if (!email?.trim()) {
+    throw new Error('Email is required')
+  }
+
+  const cfg = getServerConfig()
+  const adminClient = createSupabaseClient(
+    cfg.SUPABASE_URL,
+    cfg.SUPABASE_SERVICE_ROLE_KEY
+  )
+
+  const { error } = await adminClient.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`,
+  })
+
+  if (error) {
+    throw new Error(`Password reset request failed: ${error.message}`)
+  }
+
+  return { success: true, message: 'Password reset email sent' }
+}
+
+export async function resetPassword(
+  password: string,
+  accessToken: string,
+  supabase: SupabaseClient
+) {
+  if (!password) {
+    throw new Error('New password is required')
+  }
+
+  if (!accessToken) {
+    throw new Error('Access token is required')
+  }
+
+  const { data: userAuth, error: authErr } = await supabase.auth.getUser(accessToken)
+  if (authErr || !userAuth?.user) {
+    throw new Error('Invalid or expired reset token')
+  }
+
+  const cfg = getServerConfig()
+  const adminClient = createSupabaseClient(
+    cfg.SUPABASE_URL,
+    cfg.SUPABASE_SERVICE_ROLE_KEY
+  )
+
+  const { error } = await adminClient.auth.admin.updateUserById(userAuth.user.id, {
+    password,
+  })
+
+  if (error) {
+    throw new Error(`Failed to reset password: ${error.message}`)
+  }
+
+  return { success: true, message: 'Password has been successfully reset' }
+}
+
 export default {
   register,
   login,
   verifyToken,
+  getProfile,
+  updateProfile,
+  forgotPassword,
+  resetPassword,
 }
