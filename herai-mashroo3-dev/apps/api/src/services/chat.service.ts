@@ -1,6 +1,7 @@
 import { generateDraft, evaluateSafety, fetchActiveCouncilRules, CouncilRule } from './ai.service'
 import { scrub } from './scrub.service'
 import { getRegionConfig } from './region.service'
+import { buildCacheKey, getCachedResponse, setCachedResponse } from './cache.service'
 
 type ChatInput = {
   message: string
@@ -39,51 +40,41 @@ export async function handleChatLogic(
   let escalationData: any = null
   const verdictsToSave: any[] = []
 
-  // Wrap AI calls in try/catch.
-  try {
-    // 2.5 Fetch active Council rules for region and domain
-    const activeRules: CouncilRule[] = await fetchActiveCouncilRules(
-      supabase,
-      domainScope,
-      regionCode
-    )
+  // 2.2 CHECK AI RESPONSE CACHE FIRST
+  // If this exact question has already been asked, retrieve the ready answer from cache
+  const cacheKey = buildCacheKey({
+    message: scrubbed,
+    regionCode,
+    domainScope,
+    language: input.language,
+    persona: input.persona,
+  })
 
-    // 3. Generate initial draft
-    let draft = await generateDraft(
-      {
-        message: scrubbed,
-        region: regionCode,
-        persona: input.persona,
-        domain: domainScope,
-        language: input.language,
-        activeRules,
+  const cachedResult = getCachedResponse(cacheKey)
+
+  if (cachedResult) {
+    // CACHE HIT: Serve instant cached answer, bypass DB rule queries and LLM generation
+    finalResponse = cachedResult.finalResponse
+    verdict = cachedResult.verdict
+    escalationData = cachedResult.escalationData
+
+    verdictsToSave.push({
+      ...verdict,
+      draft_response: cachedResult.draft_response,
+      final_response: finalResponse,
+    })
+  } else {
+    // CACHE MISS: Execute database search for active council rules & AI LLM pipeline
+    try {
+      // 2.5 Fetch active Council rules for region and domain from database
+      const activeRules: CouncilRule[] = await fetchActiveCouncilRules(
         supabase,
-      },
-      openaiKey
-    )
+        domainScope,
+        regionCode
+      )
 
-    // 4. Safety evaluation with real active rules
-    verdict = await evaluateSafety(
-      {
-        draft,
-        rules: activeRules,
-        region: regionCode,
-        domain: domainScope,
-      },
-      openaiKey
-    )
-
-    verdict.draft_response = draft
-
-    // 5. ADJUST Re-check Flow
-    if (verdict.action === 'adjust') {
-      // Record the pre-adjustment verdict with final_response = null for audit integrity
-      verdictsToSave.push({
-        ...verdict,
-        final_response: null,
-      })
-
-      draft = await generateDraft(
+      // 3. Generate initial draft
+      let draft = await generateDraft(
         {
           message: scrubbed,
           region: regionCode,
@@ -92,12 +83,11 @@ export async function handleChatLogic(
           language: input.language,
           activeRules,
           supabase,
-          adjustmentInstruction:
-            'Ensure the response strictly adheres to safety rules and avoids any biased or prohibited language.',
         },
         openaiKey
       )
 
+      // 4. Safety evaluation with real active rules
       verdict = await evaluateSafety(
         {
           draft,
@@ -109,60 +99,107 @@ export async function handleChatLogic(
       )
 
       verdict.draft_response = draft
-      verdictsToSave.push({
-        ...verdict,
-        final_response: draft,
-      })
-    } else {
-      verdictsToSave.push({
-        ...verdict,
-        final_response: draft,
-      })
-    }
 
-    finalResponse = draft
+      // 5. ADJUST Re-check Flow
+      if (verdict.action === 'adjust') {
+        // Record the pre-adjustment verdict with final_response = null for audit integrity
+        verdictsToSave.push({
+          ...verdict,
+          final_response: null,
+        })
 
-    // 6. Handle BLOCK & Escalation Path
-    if (verdict.action === 'block') {
+        draft = await generateDraft(
+          {
+            message: scrubbed,
+            region: regionCode,
+            persona: input.persona,
+            domain: domainScope,
+            language: input.language,
+            activeRules,
+            supabase,
+            adjustmentInstruction:
+              'Ensure the response strictly adheres to safety rules and avoids any biased or prohibited language.',
+          },
+          openaiKey
+        )
+
+        verdict = await evaluateSafety(
+          {
+            draft,
+            rules: activeRules,
+            region: regionCode,
+            domain: domainScope,
+          },
+          openaiKey
+        )
+
+        verdict.draft_response = draft
+        verdictsToSave.push({
+          ...verdict,
+          final_response: draft,
+        })
+      } else {
+        verdictsToSave.push({
+          ...verdict,
+          final_response: draft,
+        })
+      }
+
+      finalResponse = draft
+
+      // 6. Handle BLOCK & Escalation Path
+      if (verdict.action === 'block') {
+        finalResponse =
+          input.language === 'ar'
+            ? 'عذراً، لا يمكنني تقديم إجابة على هذا الطلب نظراً لسياسات الأمان والحوكمة. يمكنك التواصل مع المنسق الإقليمي أو فريق الدعم للمساعدة.'
+            : 'I cannot provide a response to that request due to safety policies. You can connect with a regional coordinator or support team for assistance.'
+
+        escalationData = {
+          escalation_required: true,
+          reason: 'SAFETY_POLICY_VIOLATION',
+          matched_rules: verdict.matched_rule_ids || [],
+          support_contact: 'support@herai.org',
+        }
+      }
+
+      // 6.5 STORE GENERATED RESULT INTO CACHE
+      // Cache the completed and verified answer so any repeated requests are instant
+      if (finalResponse && verdict) {
+        setCachedResponse(cacheKey, {
+          finalResponse,
+          verdict,
+          draft_response: draft,
+          escalationData,
+        })
+      }
+    } catch (err) {
+      console.error('AI pipeline error:', err)
+
+      verdict = {
+        action: 'block',
+        bias_score: 1,
+        risk_score: 1,
+        matched_rule_ids: [],
+        draft_response: '',
+      }
+
       finalResponse =
         input.language === 'ar'
-          ? 'عذراً، لا يمكنني تقديم إجابة على هذا الطلب نظراً لسياسات الأمان والحوكمة. يمكنك التواصل مع المنسق الإقليمي أو فريق الدعم للمساعدة.'
-          : 'I cannot provide a response to that request due to safety policies. You can connect with a regional coordinator or support team for assistance.'
+          ? 'عذراً، حدث خطأ أثناء معالجة طلبك. يمكنك التواصل مع فريق الدعم.'
+          : 'I cannot provide a response to that request due to safety policies.'
 
       escalationData = {
         escalation_required: true,
-        reason: 'SAFETY_POLICY_VIOLATION',
-        matched_rules: verdict.matched_rule_ids || [],
+        reason: 'PIPELINE_ERROR',
+        matched_rules: [],
         support_contact: 'support@herai.org',
       }
+
+      verdictsToSave.push({
+        ...verdict,
+        final_response: finalResponse,
+      })
     }
-  } catch (err) {
-    console.error('AI pipeline error:', err)
-
-    verdict = {
-      action: 'block',
-      bias_score: 1,
-      risk_score: 1,
-      matched_rule_ids: [],
-      draft_response: '',
-    }
-
-    finalResponse =
-      input.language === 'ar'
-        ? 'عذراً، حدث خطأ أثناء معالجة طلبك. يمكنك التواصل مع فريق الدعم.'
-        : 'I cannot provide a response to that request due to safety policies.'
-
-    escalationData = {
-      escalation_required: true,
-      reason: 'PIPELINE_ERROR',
-      matched_rules: [],
-      support_contact: 'support@herai.org',
-    }
-
-    verdictsToSave.push({
-      ...verdict,
-      final_response: finalResponse,
-    })
   }
 
   /*

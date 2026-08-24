@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express'
 import authMiddleware from '../middleware/auth.middleware'
 import councilMiddleware from '../middleware/council.middleware'
 import { registerCouncilMember, getCouncilMemberStatus, updateCouncilMemberStatus, getAllCouncilMembers } from '../services/council.service'
+import { clearResponseCache } from '../services/cache.service'
 
 type ServiceRequest = Request & { services?: { supabase?: any }; user?: { id: string; email: string } }
 
@@ -15,7 +16,13 @@ router.post('/register', authMiddleware, async (req: ServiceRequest, res: Respon
     const user_id = req.user?.id
     if (!user_id || !supabase) return res.status(401).json({ error: 'Unauthorized or Missing deps' })
 
-    const result = await registerCouncilMember(user_id, supabase)
+    const { motivation, experience, contribution, availability } = req.body || {}
+    const result = await registerCouncilMember(user_id, supabase, {
+      motivation,
+      experience,
+      contribution,
+      availability,
+    })
     res.json(result)
   } catch (err: any) {
     res.status(500).json({ error: String(err.message || err) })
@@ -102,6 +109,11 @@ router.post('/rules', authMiddleware, councilMiddleware, async (req: ServiceRequ
     }]).select().single()
 
     if (error) throw error
+
+    // Invalidate AI response cache — new rules may change what answers are safe.
+    clearResponseCache()
+    console.log('[cache] AI response cache cleared after new council rule added.')
+
     res.status(201).json(data)
   } catch (err: any) {
     console.error('council.rules error', err)
@@ -131,6 +143,11 @@ router.delete('/rules/:id', authMiddleware, councilMiddleware, async (req: Servi
 
     const { error } = await supabase.from('council_rules').delete().eq('id', req.params.id)
     if (error) throw error
+
+    // Invalidate AI response cache — removed rules may affect previously cached answers.
+    clearResponseCache()
+    console.log('[cache] AI response cache cleared after council rule deleted.')
+
     res.json({ success: true })
   } catch (err: any) {
     res.status(500).json({ error: String(err.message || err) })
