@@ -235,7 +235,6 @@ export default function ProfilePage() {
   const [councilStatus, setCouncilStatus] =
     useState<CouncilState>("loading");
 
-  // Edit profile state
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     firstName: "",
@@ -267,6 +266,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!languageReady) return;
+
     localStorage.setItem("herai_language", lang);
     document.documentElement.lang = lang;
     document.documentElement.dir =
@@ -280,11 +280,21 @@ export default function ProfilePage() {
     if (storedUser) {
       try {
         currentUser = JSON.parse(storedUser);
+
         if (currentUser) {
-          const fName = currentUser.firstName || currentUser.first_name || "";
-          const lName = currentUser.lastName || currentUser.last_name || "";
-          const phone = currentUser.phoneNumber || currentUser.phone_number || "";
-          
+          const fName =
+            currentUser.firstName ||
+            currentUser.first_name ||
+            "";
+          const lName =
+            currentUser.lastName ||
+            currentUser.last_name ||
+            "";
+          const phone =
+            currentUser.phoneNumber ||
+            currentUser.phone_number ||
+            "";
+
           setUser({
             ...currentUser,
             firstName: fName,
@@ -310,16 +320,29 @@ export default function ProfilePage() {
     const token = localStorage.getItem("herai_access_token");
 
     if (token) {
-      // Fetch fresh profile from backend
       getUserProfile(token)
         .then((profile) => {
           if (profile) {
-            const fName = profile.first_name || currentUser?.firstName || "";
-            const lName = profile.last_name || currentUser?.lastName || "";
-            const phone = profile.phone_number || currentUser?.phoneNumber || "";
+            const fName =
+              profile.first_name ||
+              currentUser?.firstName ||
+              "";
+
+            const lName =
+              profile.last_name ||
+              currentUser?.lastName ||
+              "";
+
+            const phone =
+              profile.phone_number ||
+              currentUser?.phoneNumber ||
+              "";
 
             const mergedUser: User = {
-              ...(currentUser || { id: profile.id, email: profile.email }),
+              ...(currentUser || {
+                id: profile.id,
+                email: profile.email,
+              }),
               id: profile.id,
               email: profile.email,
               firstName: fName,
@@ -335,7 +358,10 @@ export default function ProfilePage() {
             };
 
             setUser(mergedUser);
-            localStorage.setItem("herai_user", JSON.stringify(mergedUser));
+            localStorage.setItem(
+              "herai_user",
+              JSON.stringify(mergedUser)
+            );
 
             setEditForm({
               firstName: fName,
@@ -358,13 +384,18 @@ export default function ProfilePage() {
               return;
             }
 
-            fetch(`${API_URL}/api/council/members?status=approved`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            })
+            fetch(
+              `${API_URL}/api/council/members?status=approved`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            )
               .then((res) => {
-                setCouncilStatus(res.ok ? "approved" : "none");
+                setCouncilStatus(
+                  res.ok ? "approved" : "none"
+                );
               })
               .catch(() => {
                 setCouncilStatus("none");
@@ -398,13 +429,18 @@ export default function ProfilePage() {
     window.location.href = "/login";
   }
 
-  async function handleSaveProfile(e: React.FormEvent) {
+  async function handleSaveProfile(
+    e: React.FormEvent
+  ) {
     e.preventDefault();
+
     setSavingProfile(true);
     setProfileError("");
     setProfileSuccess("");
 
-    const token = localStorage.getItem("herai_access_token");
+    const token = localStorage.getItem(
+      "herai_access_token"
+    );
 
     try {
       if (token) {
@@ -413,7 +449,9 @@ export default function ProfilePage() {
             firstName: editForm.firstName.trim(),
             lastName: editForm.lastName.trim(),
             phoneNumber: editForm.phoneNumber.trim(),
-            age: editForm.age ? Number(editForm.age) : undefined,
+            age: editForm.age
+              ? Number(editForm.age)
+              : undefined,
             domain: editForm.domain.trim(),
             country: editForm.country.trim(),
             city: editForm.city.trim(),
@@ -422,7 +460,6 @@ export default function ProfilePage() {
         );
       }
 
-      // Update local storage and user state
       const updatedUser: User = {
         ...(user || { id: "local-user" }),
         firstName: editForm.firstName.trim(),
@@ -431,20 +468,27 @@ export default function ProfilePage() {
         last_name: editForm.lastName.trim(),
         phoneNumber: editForm.phoneNumber.trim(),
         phone_number: editForm.phoneNumber.trim(),
-        age: editForm.age ? Number(editForm.age) : undefined,
+        age: editForm.age
+          ? Number(editForm.age)
+          : undefined,
         domain: editForm.domain.trim(),
         country: editForm.country.trim(),
         city: editForm.city.trim(),
       };
 
       setUser(updatedUser);
-      localStorage.setItem("herai_user", JSON.stringify(updatedUser));
+      localStorage.setItem(
+        "herai_user",
+        JSON.stringify(updatedUser)
+      );
 
       setProfileSuccess(t.profileUpdated);
       setIsEditing(false);
     } catch (err) {
       setProfileError(
-        err instanceof Error ? err.message : t.profileUpdateError
+        err instanceof Error
+          ? err.message
+          : t.profileUpdateError
       );
     } finally {
       setSavingProfile(false);
@@ -463,7 +507,9 @@ export default function ProfilePage() {
 
         <div className="relative text-center">
           <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-[#1A1A1A]/10 border-t-[#B8860B]" />
-          <p className="mt-5 text-sm text-[#1A1A1A]/45">{t.loading}</p>
+          <p className="mt-5 text-sm text-[#1A1A1A]/45">
+            {t.loading}
+          </p>
         </div>
       </main>
     );
@@ -481,7 +527,7 @@ export default function ProfilePage() {
 
         <div className="relative mx-auto max-w-5xl">
           <header className="flex items-center justify-between border-b border-[#1A1A1A]/10 pb-5">
-            <span className="text-lg font-semibold tracking-tight cursor-default select-none">
+            <span className="cursor-default select-none text-lg font-semibold tracking-tight">
               {t.brand}
             </span>
 
@@ -533,16 +579,18 @@ export default function ProfilePage() {
   }
 
   const fullName =
-    `${user.firstName || user.first_name || ""} ${user.lastName || user.last_name || ""}`.trim() ||
-    t.defaultUser;
+    `${user.firstName || user.first_name || ""} ${
+      user.lastName || user.last_name || ""
+    }`.trim() || t.defaultUser;
 
-  const initials = fullName
-    .split(" ")
-    .filter(Boolean)
-    .map((name) => name.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "H";
+  const initials =
+    fullName
+      .split(" ")
+      .filter(Boolean)
+      .map((name) => name.charAt(0))
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "H";
 
   const isCouncil = councilStatus === "approved";
 
@@ -565,7 +613,7 @@ export default function ProfilePage() {
       <div className="relative mx-auto max-w-6xl">
         {/* HEADER */}
         <header className="flex items-center justify-between border-b border-[#1A1A1A]/10 pb-5">
-          <span className="text-lg font-semibold tracking-tight cursor-default select-none">
+          <span className="cursor-default select-none text-lg font-semibold tracking-tight">
             {t.brand}
           </span>
 
@@ -602,7 +650,9 @@ export default function ProfilePage() {
             <p className="mt-5 max-w-xl text-base leading-8 text-[#1A1A1A]/55">
               {t.welcomeBack},{" "}
               <span className="font-medium text-[#1A1A1A]/75">
-                {user.firstName || user.first_name || t.welcomeFallback}
+                {user.firstName ||
+                  user.first_name ||
+                  t.welcomeFallback}
               </span>
               . {t.welcomeText}
             </p>
@@ -668,7 +718,11 @@ export default function ProfilePage() {
                     className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#1A1A1A]/15 bg-white px-6 text-sm font-semibold text-[#1A1A1A] shadow-sm transition hover:border-[#B8860B]/40 hover:bg-[#FBF7EC]/60"
                   >
                     <span>⚙️</span>
-                    <span>{isEditing ? t.viewProfile : t.editProfile}</span>
+                    <span>
+                      {isEditing
+                        ? t.viewProfile
+                        : t.editProfile}
+                    </span>
                   </button>
 
                   <Link
@@ -676,6 +730,7 @@ export default function ProfilePage() {
                     className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-[#B8860B] px-7 text-sm font-semibold text-white shadow-lg shadow-[#B8860B]/15 transition hover:-translate-y-0.5 hover:bg-[#96700A]"
                   >
                     {t.openChat}
+
                     <span
                       className={`transition ${
                         lang === "ar"
@@ -695,7 +750,9 @@ export default function ProfilePage() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/35">
                     {t.profileSummary}
                   </p>
-                  <p className="mt-2 text-sm font-medium">{fullName}</p>
+                  <p className="mt-2 text-sm font-medium">
+                    {fullName}
+                  </p>
                 </div>
 
                 <div className="rounded-2xl border border-[#1A1A1A]/5 bg-gradient-to-br from-[#FBF7EC] to-white px-5 py-4">
@@ -711,7 +768,9 @@ export default function ProfilePage() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1A1A1A]/35">
                     {t.councilStatus}
                   </p>
-                  <p className="mt-2 text-sm font-medium">{statusText}</p>
+                  <p className="mt-2 text-sm font-medium">
+                    {statusText}
+                  </p>
                 </div>
               </div>
             </div>
@@ -728,7 +787,9 @@ export default function ProfilePage() {
 
           {profileError && (
             <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
-              <p className="text-sm leading-6 text-red-800">{profileError}</p>
+              <p className="text-sm leading-6 text-red-800">
+                {profileError}
+              </p>
             </div>
           )}
 
@@ -741,25 +802,34 @@ export default function ProfilePage() {
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B8860B]">
                   {t.settingsTitle}
                 </span>
+
                 <h3 className="mt-2 text-2xl font-semibold tracking-tight">
                   {t.editProfile}
                 </h3>
+
                 <p className="mt-1 text-sm text-[#1A1A1A]/50">
                   {t.settingsSub}
                 </p>
               </div>
 
-              <form onSubmit={handleSaveProfile} className="mt-8 space-y-6">
+              <form
+                onSubmit={handleSaveProfile}
+                className="mt-8 space-y-6"
+              >
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-xs font-semibold text-[#1A1A1A]/70">
                       {t.firstName} *
                     </label>
+
                     <input
                       type="text"
                       value={editForm.firstName}
                       onChange={(e) =>
-                        setEditForm((p) => ({ ...p, firstName: e.target.value }))
+                        setEditForm((p) => ({
+                          ...p,
+                          firstName: e.target.value,
+                        }))
                       }
                       required
                       className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
@@ -770,11 +840,15 @@ export default function ProfilePage() {
                     <label className="mb-2 block text-xs font-semibold text-[#1A1A1A]/70">
                       {t.lastName} *
                     </label>
+
                     <input
                       type="text"
                       value={editForm.lastName}
                       onChange={(e) =>
-                        setEditForm((p) => ({ ...p, lastName: e.target.value }))
+                        setEditForm((p) => ({
+                          ...p,
+                          lastName: e.target.value,
+                        }))
                       }
                       required
                       className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
@@ -787,6 +861,7 @@ export default function ProfilePage() {
                     <label className="mb-2 block text-xs font-semibold text-[#1A1A1A]/70">
                       {t.phoneNumber}
                     </label>
+
                     <input
                       type="tel"
                       value={editForm.phoneNumber}
@@ -806,13 +881,17 @@ export default function ProfilePage() {
                     <label className="mb-2 block text-xs font-semibold text-[#1A1A1A]/70">
                       {t.age}
                     </label>
+
                     <input
                       type="number"
                       min="1"
                       max="120"
                       value={editForm.age}
                       onChange={(e) =>
-                        setEditForm((p) => ({ ...p, age: e.target.value }))
+                        setEditForm((p) => ({
+                          ...p,
+                          age: e.target.value,
+                        }))
                       }
                       className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
                     />
@@ -824,11 +903,15 @@ export default function ProfilePage() {
                     <label className="mb-2 block text-xs font-semibold text-[#1A1A1A]/70">
                       {t.domain}
                     </label>
+
                     <input
                       type="text"
                       value={editForm.domain}
                       onChange={(e) =>
-                        setEditForm((p) => ({ ...p, domain: e.target.value }))
+                        setEditForm((p) => ({
+                          ...p,
+                          domain: e.target.value,
+                        }))
                       }
                       placeholder="e.g. Agriculture, Food, Tech"
                       className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
@@ -839,20 +922,38 @@ export default function ProfilePage() {
                     <label className="mb-2 block text-xs font-semibold text-[#1A1A1A]/70">
                       {t.country}
                     </label>
+
                     <select
                       value={editForm.country}
                       onChange={(e) =>
-                        setEditForm((p) => ({ ...p, country: e.target.value }))
+                        setEditForm((p) => ({
+                          ...p,
+                          country: e.target.value,
+                        }))
                       }
                       className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
                     >
-                      <option value="Egypt">{t.countries.Egypt}</option>
-                      <option value="Lebanon">{t.countries.Lebanon}</option>
-                      <option value="Saudi Arabia">{t.countries.Saudi}</option>
-                      <option value="United Arab Emirates">{t.countries.UAE}</option>
-                      <option value="Morocco">{t.countries.Morocco}</option>
-                      <option value="Jordan">{t.countries.Jordan}</option>
-                      <option value="Other">{t.countries.Other}</option>
+                      <option value="Egypt">
+                        {t.countries.Egypt}
+                      </option>
+                      <option value="Lebanon">
+                        {t.countries.Lebanon}
+                      </option>
+                      <option value="Saudi Arabia">
+                        {t.countries.Saudi}
+                      </option>
+                      <option value="United Arab Emirates">
+                        {t.countries.UAE}
+                      </option>
+                      <option value="Morocco">
+                        {t.countries.Morocco}
+                      </option>
+                      <option value="Jordan">
+                        {t.countries.Jordan}
+                      </option>
+                      <option value="Other">
+                        {t.countries.Other}
+                      </option>
                     </select>
                   </div>
 
@@ -860,11 +961,15 @@ export default function ProfilePage() {
                     <label className="mb-2 block text-xs font-semibold text-[#1A1A1A]/70">
                       {t.city}
                     </label>
+
                     <input
                       type="text"
                       value={editForm.city}
                       onChange={(e) =>
-                        setEditForm((p) => ({ ...p, city: e.target.value }))
+                        setEditForm((p) => ({
+                          ...p,
+                          city: e.target.value,
+                        }))
                       }
                       placeholder="e.g. Cairo, Beirut"
                       className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
@@ -872,7 +977,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-[#1A1A1A]/8">
+                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[#1A1A1A]/8 pt-4">
                   <button
                     type="button"
                     onClick={() => setIsEditing(false)}
@@ -886,7 +991,9 @@ export default function ProfilePage() {
                     disabled={savingProfile}
                     className="rounded-full bg-[#B8860B] px-7 py-2.5 text-xs font-semibold text-white shadow-md shadow-[#B8860B]/15 transition hover:bg-[#96700A] disabled:opacity-50"
                   >
-                    {savingProfile ? t.saving : t.saveChanges}
+                    {savingProfile
+                      ? t.saving
+                      : t.saveChanges}
                   </button>
                 </div>
               </form>
@@ -895,27 +1002,20 @@ export default function ProfilePage() {
             /* ACCOUNT INFORMATION VIEW */
             <section className="relative mt-6 overflow-hidden rounded-[2rem] border border-white/80 bg-white/90 p-7 shadow-[0_20px_70px_rgba(26,26,26,0.045)] backdrop-blur-xl sm:p-10">
               <div className="relative">
-                <div className="flex flex-col gap-2 border-b border-[#1A1A1A]/8 pb-7 sm:flex-row sm:items-end sm:justify-between">
+                <div className="border-b border-[#1A1A1A]/8 pb-7">
                   <div>
                     <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B8860B]">
                       {t.accountSectionLabel}
                     </span>
+
                     <h3 className="mt-3 text-2xl font-semibold tracking-tight">
                       {t.accountInfo}
                     </h3>
+
                     <p className="mt-2 text-sm text-[#1A1A1A]/50">
                       {t.accountInfoSub}
                     </p>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsEditing(true)}
-                    className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full border border-[#B8860B]/30 bg-[#B8860B]/5 px-4 py-2 text-xs font-semibold text-[#96700A] transition hover:bg-[#B8860B]/10"
-                  >
-                    <span>✎</span>
-                    <span>{t.editProfile}</span>
-                  </button>
                 </div>
 
                 <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -923,8 +1023,11 @@ export default function ProfilePage() {
                     <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#1A1A1A]/35">
                       {t.firstName}
                     </p>
+
                     <p className="mt-3 text-base font-semibold">
-                      {user.firstName || user.first_name || t.notProvided}
+                      {user.firstName ||
+                        user.first_name ||
+                        t.notProvided}
                     </p>
                   </div>
 
@@ -932,8 +1035,11 @@ export default function ProfilePage() {
                     <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#1A1A1A]/35">
                       {t.lastName}
                     </p>
+
                     <p className="mt-3 text-base font-semibold">
-                      {user.lastName || user.last_name || t.notProvided}
+                      {user.lastName ||
+                        user.last_name ||
+                        t.notProvided}
                     </p>
                   </div>
 
@@ -941,7 +1047,11 @@ export default function ProfilePage() {
                     <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#1A1A1A]/35">
                       {t.email}
                     </p>
-                    <p dir="ltr" className="mt-3 break-all text-base font-semibold">
+
+                    <p
+                      dir="ltr"
+                      className="mt-3 break-all text-base font-semibold"
+                    >
                       {user.email || t.notProvided}
                     </p>
                   </div>
@@ -950,8 +1060,14 @@ export default function ProfilePage() {
                     <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#1A1A1A]/35">
                       {t.phoneNumber}
                     </p>
-                    <p dir="ltr" className="mt-3 text-base font-semibold">
-                      {user.phoneNumber || user.phone_number || t.notProvided}
+
+                    <p
+                      dir="ltr"
+                      className="mt-3 text-base font-semibold"
+                    >
+                      {user.phoneNumber ||
+                        user.phone_number ||
+                        t.notProvided}
                     </p>
                   </div>
 
@@ -959,6 +1075,7 @@ export default function ProfilePage() {
                     <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#1A1A1A]/35">
                       {t.domain}
                     </p>
+
                     <p className="mt-3 text-base font-semibold">
                       {user.domain || t.notProvided}
                     </p>
@@ -968,9 +1085,14 @@ export default function ProfilePage() {
                     <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#1A1A1A]/35">
                       {t.country} / {t.city}
                     </p>
+
                     <p className="mt-3 text-base font-semibold">
                       {user.country || user.city
-                        ? `${user.country || ""} ${user.city ? `(${user.city})` : ""}`.trim()
+                        ? `${user.country || ""} ${
+                            user.city
+                              ? `(${user.city})`
+                              : ""
+                          }`.trim()
                         : t.notProvided}
                     </p>
                   </div>
@@ -1010,6 +1132,7 @@ export default function ProfilePage() {
                   className="group inline-flex min-h-11 shrink-0 items-center justify-center gap-3 rounded-full bg-[#1A1A1A] px-6 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#333]"
                 >
                   {t.openDashboard}
+
                   <span
                     className={`transition ${
                       lang === "ar"
@@ -1031,6 +1154,7 @@ export default function ProfilePage() {
                 <div className="max-w-2xl">
                   <div className="flex items-center gap-3">
                     <span className="h-2 w-2 animate-pulse rounded-full bg-[#B8860B]" />
+
                     <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B8860B]">
                       {t.councilStatus}
                     </span>
@@ -1052,7 +1176,7 @@ export default function ProfilePage() {
             </section>
           )}
 
-          {/* NOT APPLIED OR REJECTED -> STRUCTURED APPLICATION CTA */}
+          {/* NOT APPLIED OR REJECTED */}
           {(councilStatus === "none" ||
             councilStatus === "rejected") && (
             <section className="relative mt-6 overflow-hidden rounded-[2rem] border border-white/80 bg-white/90 p-7 shadow-[0_20px_70px_rgba(26,26,26,0.045)] backdrop-blur-xl sm:p-9">
