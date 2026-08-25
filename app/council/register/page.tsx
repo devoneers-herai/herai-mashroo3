@@ -32,7 +32,7 @@ const API_URL =
 const content = {
   en: {
     brand: "HerAI Mashroo3",
-    back: "← Back to Council",
+    back: "← Back to profile",
 
     title: "Apply to join the Council",
 
@@ -125,12 +125,13 @@ const content = {
     required:
       "Please complete all required fields before submitting.",
 
-    backToCouncil: "Back to Council",
+    backToProfile: "Back to profile",
+    returnToProfile: "Return to profile",
   },
 
   ar: {
     brand: "HerAI Mashroo3",
-    back: "← الرجوع للمجلس",
+    back: "العودة للملف الشخصي ←",
 
     title: "التقديم للانضمام للمجلس",
 
@@ -223,13 +224,16 @@ const content = {
     required:
       "كملي كل البيانات المطلوبة قبل إرسال الطلب.",
 
-    backToCouncil: "الرجوع للمجلس",
+    backToProfile: "الرجوع للملف الشخصي",
+    returnToProfile: "العودة للملف الشخصي",
   },
 } as const;
 
 export default function CouncilRegisterPage() {
   const [lang, setLang] =
     useState<Lang>("en");
+  const [languageReady, setLanguageReady] =
+    useState(false);
 
   const [loading, setLoading] =
     useState(false);
@@ -261,14 +265,33 @@ export default function CouncilRegisterPage() {
   const t = content[lang];
 
   /*
-   * Keep the language direction synchronized
-   * with the selected language.
+   * Load the saved language preference on mount.
    */
   useEffect(() => {
+    const storedLanguage = localStorage.getItem("herai_language");
+    if (storedLanguage === "ar" || storedLanguage === "en") {
+      setLang(storedLanguage);
+    }
+    setLanguageReady(true);
+  }, []);
+
+  /*
+   * Keep the language preference, document language, and direction
+   * synchronized with the selected language.
+   */
+  useEffect(() => {
+    if (!languageReady) return;
+    localStorage.setItem("herai_language", lang);
     document.documentElement.lang = lang;
     document.documentElement.dir =
       lang === "ar" ? "rtl" : "ltr";
-  }, [lang]);
+  }, [lang, languageReady]);
+
+  function toggleLanguage() {
+    setLang((currentLang) =>
+      currentLang === "en" ? "ar" : "en"
+    );
+  }
 
   /*
    * Load the same authentication information
@@ -445,28 +468,22 @@ export default function CouncilRegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#FBF7EC] px-4 py-8 text-[#1A1A1A] sm:px-8">
+    <main
+      dir={lang === "ar" ? "rtl" : "ltr"}
+      className="min-h-screen bg-[#FBF7EC] px-4 py-8 text-[#1A1A1A] sm:px-8"
+    >
       <div className="mx-auto max-w-5xl">
 
         {/* TOP BAR */}
         <div className="flex items-center justify-between">
 
-          <Link
-            href="/council"
-            className="text-lg font-semibold tracking-tight"
-          >
+          <span className="text-lg font-semibold tracking-tight cursor-default select-none">
             {t.brand}
-          </Link>
+          </span>
 
           <button
             type="button"
-            onClick={() =>
-              setLang(
-                lang === "en"
-                  ? "ar"
-                  : "en"
-              )
-            }
+            onClick={toggleLanguage}
             className="rounded-full border border-[#1A1A1A]/15 bg-white px-4 py-2 text-xs font-medium transition hover:border-[#B8860B]/50"
           >
             {lang === "en"
@@ -483,7 +500,7 @@ export default function CouncilRegisterPage() {
           <div className="mb-8 text-center">
 
             <Link
-              href="/council"
+              href="/profile"
               className="text-sm text-[#1A1A1A]/50 transition hover:text-[#1A1A1A]"
             >
               {t.back}
@@ -813,6 +830,13 @@ export default function CouncilRegisterPage() {
                     <p className="mt-3 text-sm leading-6 text-[#7A5A00]/70">
                       {t.pendingNote}
                     </p>
+
+                    <Link
+                      href="/profile"
+                      className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-[#B8860B] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#96700A]"
+                    >
+                      {t.returnToProfile}
+                    </Link>
                   </>
                 )}
 
@@ -826,20 +850,27 @@ export default function CouncilRegisterPage() {
                     <p className="mt-2 text-sm leading-6 text-red-700/80">
                       {t.rejectedDescription}
                     </p>
+
+                    <Link
+                      href="/profile"
+                      className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-[#1A1A1A] px-6 text-sm font-semibold text-white transition hover:bg-[#333]"
+                    >
+                      {t.returnToProfile}
+                    </Link>
                   </>
                 )}
 
               </div>
             )}
 
-            {/* COUNCIL-ONLY NAVIGATION */}
+            {/* RETURN TO PROFILE NAVIGATION */}
             <div className="mt-7 border-t border-[#1A1A1A]/10 pt-6 text-center">
 
               <Link
-                href="/council"
+                href="/profile"
                 className="text-sm font-medium text-[#1A1A1A]/50 transition hover:text-[#1A1A1A]"
               >
-                {t.backToCouncil}
+                {t.backToProfile}
               </Link>
 
             </div>

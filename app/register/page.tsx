@@ -220,12 +220,9 @@ export default function RegisterPage() {
       <div className="mx-auto max-w-5xl">
         {/* TOP BAR */}
         <div className="flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-lg font-semibold tracking-tight"
-          >
+          <span className="text-lg font-semibold tracking-tight cursor-default select-none">
             {t.brand}
-          </Link>
+          </span>
 
           <button
             type="button"
