@@ -198,23 +198,25 @@ export async function chatCompletionWithFallback(
   // 1. PRIMARY: Try OpenAI GPT
   if (primaryApiKey) {
     try {
-      return await callChatProvider(
+      const reply = await callChatProvider(
         'https://api.openai.com/v1/chat/completions',
         primaryApiKey,
         primaryModel,
         messages,
         jsonMode
       )
+      console.log(`[AI Provider] 🟢 Answered by Primary Provider: OpenAI GPT (${primaryModel})`)
+      return reply
     } catch (err: any) {
       console.warn(
-        `[AI Service Warning] Primary (OpenAI GPT: ${primaryModel}) failed: ${
+        `[AI Provider Warning] ⚠️ Primary (OpenAI GPT: ${primaryModel}) failed: ${
           err?.message || err
         }. Activating Plan B (Backup AI Provider)...`
       )
     }
   } else {
     console.warn(
-      '[AI Service Warning] No Primary OPENAI_API_KEY configured. Routing directly to Plan B...'
+      '[AI Provider Warning] No Primary OPENAI_API_KEY configured. Routing directly to Plan B...'
     )
   }
 
@@ -229,16 +231,18 @@ export async function chatCompletionWithFallback(
         ? options.backupModel || 'grok-2-latest'
         : backupModel
 
-      return await callChatProvider(
+      const reply = await callChatProvider(
         backupUrl,
         backupApiKey,
         effectiveBackupModel,
         messages,
         jsonMode
       )
+      console.log(`[AI Provider] 🔄 Answered by Backup Plan B: ${isXAI ? 'xAI Grok' : 'Groq'} (${effectiveBackupModel})`)
+      return reply
     } catch (backupErr: any) {
       console.error(
-        `[AI Service Error] Backup Plan B failed: ${
+        `[AI Service Error] ❌ Backup Plan B failed: ${
           backupErr?.message || backupErr
         }`
       )
