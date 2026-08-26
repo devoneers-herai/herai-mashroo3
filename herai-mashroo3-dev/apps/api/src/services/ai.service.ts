@@ -5,7 +5,7 @@ type DraftInput = {
   domain?: string
   adjustmentInstruction?: string
   language?: string
-  supabase?: any  // Supabase client to fetch council rules
+  supabase?: any // Supabase client to fetch council rules
 }
 
 // Domain-specific system prompts
@@ -47,40 +47,11 @@ Offer practical business advice tailored to the local market.`,
   default: `You are the HerAI assistant. You provide helpful, accurate, and culturally sensitive information.`,
 }
 
-type Verdict = {
+export type Verdict = {
   bias_score: number
   risk_score: number
   action: 'safe' | 'adjust' | 'block'
   matched_rule_ids: string[]
-}
-
-const OPENAI_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-
-async function openaiChat(messages: {role: string; content: string}[], model = 'allam-2-7b', apiKey?: string, jsonMode = false) {
-  if (!apiKey) throw new Error('OPENAI_API_KEY is required')
-
-  const payload: any = { model, messages, max_tokens: 800, temperature: 0.2 }
-  if (jsonMode) {
-    payload.response_format = { type: 'json_object' }
-  }
-
-  const res = await fetch(OPENAI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(payload),
-  })
-
-  if (!res.ok) {
-    const txt = await res.text()
-    throw new Error(`OpenAI error ${res.status}: ${txt}`)
-  }
-
-  const data = await res.json()
-  const content = data?.choices?.[0]?.message?.content
-  return String(content ?? '')
 }
 
 const UNIVERSAL_SAFETY_DIRECTIVE = `
@@ -101,12 +72,16 @@ UNIVERSAL SAFETY & EMPOWERMENT DIRECTIVES FOR FEMALE ENTREPRENEURS:
 function getSystemPrompt(input: DraftInput): string {
   const domain = input.domain?.toLowerCase() || 'default'
   const domainPrompt = DOMAIN_PROMPTS[domain] || DOMAIN_PROMPTS.default
-  
+
   const regionContext = input.region ? `\nRegion: ${input.region}` : ''
   const personaContext = input.persona ? ` (Persona: ${input.persona})` : ''
-  const adjustmentContext = input.adjustmentInstruction ? `\nCRITICAL INSTRUCTION: ${input.adjustmentInstruction}` : ''
-  const languageContext = input.language ? `\nIMPORTANT: You MUST respond in ${input.language === 'ar' ? 'Arabic' : 'English'}, regardless of the language the user types in.` : ''
-  
+  const adjustmentContext = input.adjustmentInstruction
+    ? `\nCRITICAL INSTRUCTION: ${input.adjustmentInstruction}`
+    : ''
+  const languageContext = input.language
+    ? `\nIMPORTANT: You MUST respond in ${input.language === 'ar' ? 'Arabic' : 'English'}, regardless of the language the user types in.`
+    : ''
+
   return `${domainPrompt}\n${UNIVERSAL_SAFETY_DIRECTIVE}${regionContext}${personaContext}${adjustmentContext}${languageContext}`
 }
 
@@ -149,13 +124,142 @@ function formatRulesBlock(rules: CouncilRule[]): string {
   return `\n\nCOUNCIL RULES (you MUST follow these):\n${rulesBlock}`
 }
 
+/**
+ * Execute a single HTTP call to an OpenAI-compatible chat completion endpoint.
+ */
+async function callChatProvider(
+  url: string,
+  apiKey: string,
+  model: string,
+  messages: { role: string; content: string }[],
+  jsonMode: boolean = false
+): Promise<string> {
+  const payload: any = {
+    model,
+    messages,
+    max_tokens: 800,
+    temperature: 0.2,
+  }
+  if (jsonMode) {
+    payload.response_format = { type: 'json_object' }
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    const txt = await res.text()
+    throw new Error(`Provider API error ${res.status}: ${txt}`)
+  }
+
+  const data = await res.json()
+  const content = data?.choices?.[0]?.message?.content
+  if (content === undefined || content === null) {
+    throw new Error('No content returned in choices[0].message')
+  }
+  return String(content)
+}
+
+/**
+ * Unified Chat Completion function with automatic fallback.
+ * Primary: OpenAI GPT
+ * Plan B / Backup: Groq / Grok (xAI)
+ */
+export async function chatCompletionWithFallback(
+  messages: { role: string; content: string }[],
+  options: {
+    jsonMode?: boolean
+    primaryApiKey?: string
+    backupApiKey?: string
+    primaryModel?: string
+    backupModel?: string
+  } = {}
+): Promise<string> {
+  const primaryApiKey =
+    options.primaryApiKey || process.env.OPENAI_API_KEY || ''
+  const backupApiKey =
+    options.backupApiKey ||
+    process.env.BACKUP_AI_KEY ||
+    process.env.GROQ_API_KEY ||
+    process.env.GROK_API_KEY ||
+    ''
+  const primaryModel =
+    options.primaryModel || process.env.OPENAI_MODEL || 'gpt-4o-mini'
+  const backupModel =
+    options.backupModel || process.env.BACKUP_AI_MODEL || 'allam-2-7b'
+  const jsonMode = Boolean(options.jsonMode)
+
+  // 1. PRIMARY: Try OpenAI GPT
+  if (primaryApiKey) {
+    try {
+      return await callChatProvider(
+        'https://api.openai.com/v1/chat/completions',
+        primaryApiKey,
+        primaryModel,
+        messages,
+        jsonMode
+      )
+    } catch (err: any) {
+      console.warn(
+        `[AI Service Warning] Primary (OpenAI GPT: ${primaryModel}) failed: ${
+          err?.message || err
+        }. Activating Plan B (Backup AI Provider)...`
+      )
+    }
+  } else {
+    console.warn(
+      '[AI Service Warning] No Primary OPENAI_API_KEY configured. Routing directly to Plan B...'
+    )
+  }
+
+  // 2. BACKUP / PLAN B: Try Groq / Grok
+  if (backupApiKey) {
+    try {
+      const isXAI = backupApiKey.startsWith('xai-')
+      const backupUrl = isXAI
+        ? 'https://api.x.ai/v1/chat/completions'
+        : 'https://api.groq.com/openai/v1/chat/completions'
+      const effectiveBackupModel = isXAI
+        ? options.backupModel || 'grok-2-latest'
+        : backupModel
+
+      return await callChatProvider(
+        backupUrl,
+        backupApiKey,
+        effectiveBackupModel,
+        messages,
+        jsonMode
+      )
+    } catch (backupErr: any) {
+      console.error(
+        `[AI Service Error] Backup Plan B failed: ${
+          backupErr?.message || backupErr
+        }`
+      )
+      throw new Error(
+        `All AI providers failed. Primary OpenAI failed and Backup Plan B failed: ${
+          backupErr?.message || backupErr
+        }`
+      )
+    }
+  }
+
+  throw new Error(
+    'No AI API keys configured (both OPENAI_API_KEY and backup GROQ/GROK_API_KEY are missing).'
+  )
+}
+
 export async function generateDraft(
   input: DraftInput & { activeRules?: CouncilRule[] },
-  openaiApiKey: string
+  openaiApiKey?: string,
+  backupApiKey?: string
 ): Promise<string> {
-  const apiKey = openaiApiKey
-  if (!apiKey) throw new Error('OPENAI_API_KEY is required')
-
   // Use provided active rules or fetch them if supabase is provided
   let rules: CouncilRule[] = input.activeRules || []
   if (rules.length === 0 && input.supabase) {
@@ -169,7 +273,11 @@ export async function generateDraft(
     { role: 'user', content: input.message },
   ]
 
-  const reply = await openaiChat(messages, 'allam-2-7b', apiKey)
+  const reply = await chatCompletionWithFallback(messages, {
+    primaryApiKey: openaiApiKey,
+    backupApiKey,
+    jsonMode: false,
+  })
   return reply
 }
 
@@ -182,11 +290,9 @@ export type SafetyEvaluationInput = {
 
 export async function evaluateSafety(
   input: SafetyEvaluationInput | string,
-  openaiApiKey: string
+  openaiApiKey?: string,
+  backupApiKey?: string
 ): Promise<Verdict> {
-  const apiKey = openaiApiKey
-  if (!apiKey) throw new Error('OPENAI_API_KEY is required')
-
   const draft = typeof input === 'string' ? input : input.draft
   const rules = typeof input === 'object' && input.rules ? input.rules : []
   const region = typeof input === 'object' ? input.region : undefined
@@ -225,17 +331,27 @@ TASK:
     { role: 'user', content: instruction },
   ]
 
-  const reply = await openaiChat(messages, 'allam-2-7b', apiKey, true)
+  let reply = ''
+  try {
+    reply = await chatCompletionWithFallback(messages, {
+      primaryApiKey: openaiApiKey,
+      backupApiKey,
+      jsonMode: true,
+    })
+  } catch (err) {
+    console.error('Safety evaluation API error:', err)
+    return { bias_score: 1, risk_score: 1, action: 'block', matched_rule_ids: [] }
+  }
 
   try {
     let cleanReply = reply.trim()
-    
+
     // Attempt to extract JSON if it was wrapped in code blocks or conversational padding
     const jsonMatch = cleanReply.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       cleanReply = jsonMatch[0]
     }
-    
+
     const parsed = JSON.parse(cleanReply)
     return {
       bias_score: Number(parsed.bias_score ?? 0),
@@ -249,5 +365,9 @@ TASK:
   }
 }
 
-export default { generateDraft, evaluateSafety, fetchActiveCouncilRules }
-
+export default {
+  generateDraft,
+  evaluateSafety,
+  fetchActiveCouncilRules,
+  chatCompletionWithFallback,
+}

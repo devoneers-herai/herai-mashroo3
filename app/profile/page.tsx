@@ -20,10 +20,55 @@ type User = {
   phoneNumber?: string;
   phone_number?: string;
   age?: number;
+  birthDate?: string;
+  birth_date?: string;
   domain?: string;
   country?: string;
   city?: string;
 };
+
+function getAgeFromDate(dateStr: string): number | undefined {
+  if (!dateStr) return undefined;
+  const birth = new Date(dateStr);
+  if (isNaN(birth.getTime())) return undefined;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age >= 0 ? age : undefined;
+}
+
+function formatBirthDisplay(user: User | null, lang: Lang): string {
+  if (!user) return "";
+  const rawDate = user.birthDate || user.birth_date;
+  if (rawDate) {
+    const d = new Date(rawDate);
+    if (!isNaN(d.getTime())) {
+      const age = getAgeFromDate(rawDate);
+      const formattedDate = d.toLocaleDateString(
+        lang === "ar" ? "ar-EG" : "en-GB",
+        {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }
+      );
+      return age !== undefined
+        ? `${formattedDate} (${age} ${lang === "ar" ? "سنة" : "years old"})`
+        : formattedDate;
+    }
+  }
+  if (user.age) {
+    if (user.age > 1900 && user.age <= new Date().getFullYear()) {
+      const calculatedAge = new Date().getFullYear() - user.age;
+      return `${user.age} (${calculatedAge} ${lang === "ar" ? "سنة" : "years old"})`;
+    }
+    return `${user.age} ${lang === "ar" ? "سنة" : "years old"}`;
+  }
+  return "";
+}
 
 type CouncilState =
   | "loading"
@@ -78,7 +123,7 @@ const translations = {
     lastName: "Last name",
     email: "Email address",
     phoneNumber: "Phone number",
-    age: "Age",
+    birthDate: "Date of birth",
     domain: "Business domain",
     country: "Country",
     city: "City",
@@ -172,7 +217,7 @@ const translations = {
     lastName: "اسم العائلة",
     email: "البريد الإلكتروني",
     phoneNumber: "رقم الموبايل",
-    age: "السن",
+    birthDate: "تاريخ الميلاد",
     domain: "مجال الشغل / الأعمال",
     country: "الدولة",
     city: "المدينة",
@@ -241,7 +286,7 @@ export default function ProfilePage() {
     firstName: "",
     lastName: "",
     phoneNumber: "",
-    age: "",
+    birthDate: "",
     domain: "",
     country: "Egypt",
     city: "",
@@ -284,7 +329,13 @@ export default function ProfilePage() {
           const fName = currentUser.firstName || currentUser.first_name || "";
           const lName = currentUser.lastName || currentUser.last_name || "";
           const phone = currentUser.phoneNumber || currentUser.phone_number || "";
-          
+          const bDate =
+            currentUser.birthDate ||
+            currentUser.birth_date ||
+            (currentUser.age && currentUser.age > 1900
+              ? `${currentUser.age}-01-01`
+              : "");
+
           setUser({
             ...currentUser,
             firstName: fName,
@@ -296,7 +347,7 @@ export default function ProfilePage() {
             firstName: fName,
             lastName: lName,
             phoneNumber: phone,
-            age: currentUser.age ? String(currentUser.age) : "",
+            birthDate: bDate,
             domain: currentUser.domain || "",
             country: currentUser.country || "Egypt",
             city: currentUser.city || "",
@@ -317,6 +368,10 @@ export default function ProfilePage() {
             const fName = profile.first_name || currentUser?.firstName || "";
             const lName = profile.last_name || currentUser?.lastName || "";
             const phone = profile.phone_number || currentUser?.phoneNumber || "";
+            const bDate =
+              (currentUser as any)?.birthDate ||
+              (currentUser as any)?.birth_date ||
+              "";
 
             const mergedUser: User = {
               ...(currentUser || { id: profile.id, email: profile.email }),
@@ -329,6 +384,7 @@ export default function ProfilePage() {
               phoneNumber: phone,
               phone_number: profile.phone_number,
               age: profile.age,
+              birthDate: bDate,
               domain: profile.domain,
               country: profile.country || "Egypt",
               city: profile.city,
@@ -341,7 +397,7 @@ export default function ProfilePage() {
               firstName: fName,
               lastName: lName,
               phoneNumber: phone,
-              age: profile.age ? String(profile.age) : "",
+              birthDate: bDate,
               domain: profile.domain || "",
               country: profile.country || "Egypt",
               city: profile.city || "",
@@ -407,13 +463,17 @@ export default function ProfilePage() {
     const token = localStorage.getItem("herai_access_token");
 
     try {
+      const calculatedAge = editForm.birthDate
+        ? getAgeFromDate(editForm.birthDate)
+        : user?.age;
+
       if (token) {
         await updateUserProfile(
           {
             firstName: editForm.firstName.trim(),
             lastName: editForm.lastName.trim(),
             phoneNumber: editForm.phoneNumber.trim(),
-            age: editForm.age ? Number(editForm.age) : undefined,
+            age: calculatedAge,
             domain: editForm.domain.trim(),
             country: editForm.country.trim(),
             city: editForm.city.trim(),
@@ -431,7 +491,9 @@ export default function ProfilePage() {
         last_name: editForm.lastName.trim(),
         phoneNumber: editForm.phoneNumber.trim(),
         phone_number: editForm.phoneNumber.trim(),
-        age: editForm.age ? Number(editForm.age) : undefined,
+        age: calculatedAge,
+        birthDate: editForm.birthDate,
+        birth_date: editForm.birthDate,
         domain: editForm.domain.trim(),
         country: editForm.country.trim(),
         city: editForm.city.trim(),
@@ -658,19 +720,6 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditing(!isEditing);
-                      setProfileSuccess("");
-                      setProfileError("");
-                    }}
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#1A1A1A]/15 bg-white px-6 text-sm font-semibold text-[#1A1A1A] shadow-sm transition hover:border-[#B8860B]/40 hover:bg-[#FBF7EC]/60"
-                  >
-                    <span>⚙️</span>
-                    <span>{isEditing ? t.viewProfile : t.editProfile}</span>
-                  </button>
-
                   <Link
                     href="/chat"
                     className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-[#B8860B] px-7 text-sm font-semibold text-white shadow-lg shadow-[#B8860B]/15 transition hover:-translate-y-0.5 hover:bg-[#96700A]"
@@ -804,15 +853,15 @@ export default function ProfilePage() {
 
                   <div>
                     <label className="mb-2 block text-xs font-semibold text-[#1A1A1A]/70">
-                      {t.age}
+                      {t.birthDate}
                     </label>
                     <input
-                      type="number"
-                      min="1"
-                      max="120"
-                      value={editForm.age}
+                      type="date"
+                      min="1920-01-01"
+                      max={new Date().toISOString().split("T")[0]}
+                      value={editForm.birthDate}
                       onChange={(e) =>
-                        setEditForm((p) => ({ ...p, age: e.target.value }))
+                        setEditForm((p) => ({ ...p, birthDate: e.target.value }))
                       }
                       className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
                     />
@@ -952,6 +1001,15 @@ export default function ProfilePage() {
                     </p>
                     <p dir="ltr" className="mt-3 text-base font-semibold">
                       {user.phoneNumber || user.phone_number || t.notProvided}
+                    </p>
+                  </div>
+
+                  <div className="group rounded-2xl border border-[#1A1A1A]/8 bg-gradient-to-br from-[#FBF7EC]/80 to-white p-5 transition hover:-translate-y-0.5 hover:border-[#B8860B]/25">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#1A1A1A]/35">
+                      {t.birthDate}
+                    </p>
+                    <p className="mt-3 text-base font-semibold">
+                      {formatBirthDisplay(user, lang) || t.notProvided}
                     </p>
                   </div>
 
