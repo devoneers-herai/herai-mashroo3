@@ -1,6 +1,3 @@
-import fs from 'fs'
-import path from 'path'
-
 export type RegionConfig = {
   region_code: string
   version: string
@@ -11,67 +8,58 @@ export type RegionConfig = {
 }
 
 /**
+ * Static region configurations — embedded directly to avoid file-path
+ * resolution issues across different deployment environments (Railway, Vercel, local).
+ */
+const REGION_CONFIGS: Record<string, RegionConfig> = {
+  EG: {
+    region_code: 'EG',
+    version: 'v1',
+    active_safety_ruleset_id: 'ruleset-eg-v1',
+    active_council_content_version: 'council-eg-v1',
+    channel_fallback_order: ['whatsapp', 'sms', 'voice'],
+    domain_scope: ['agri'],
+  },
+  LB: {
+    region_code: 'LB',
+    version: 'v1',
+    active_safety_ruleset_id: 'ruleset-lb-v1',
+    active_council_content_version: 'council-lb-v1',
+    channel_fallback_order: ['whatsapp', 'sms', 'voice'],
+    domain_scope: ['agri'],
+  },
+}
+
+/**
  * Runtime Region Resolution Service
  *
- * Loads region configuration from static JSON files.
- * At runtime, the system determines the Region, then resolves its configuration.
- *
- * Flow: region_code → load region_config → get active configuration/version → use configuration
+ * Resolves region configuration from the static REGION_CONFIGS map.
+ * Flow: region_code → lookup config → use configuration
  */
 class RegionResolver {
   private configCache: Map<string, RegionConfig> = new Map()
-  private configDir: string
 
-  constructor() {
-    // Config directory path — relative to compiled output location
-    this.configDir = path.join(__dirname, '../../../..', 'herai_backend_contracts/config')
-  }
-
-  /**
-   * Resolve region configuration by region code.
-   * Loads from region_config.{REGION}.json, caches result.
-   */
   async resolveRegionConfig(regionCode: string): Promise<RegionConfig | null> {
-    try {
-      if (this.configCache.has(regionCode)) {
-        return this.configCache.get(regionCode) || null
-      }
-
-      const configPath = path.join(this.configDir, `region_config.${regionCode}.json`)
-
-      if (!fs.existsSync(configPath)) {
-        console.warn(`Region config not found for ${regionCode} at ${configPath}`)
-        return null
-      }
-
-      const configContent = fs.readFileSync(configPath, 'utf-8')
-      const config: RegionConfig = JSON.parse(configContent)
-
-      this.configCache.set(regionCode, config)
-      return config
-    } catch (error) {
-      console.error(`Error resolving region config for ${regionCode}:`, error)
-      return null
+    if (this.configCache.has(regionCode)) {
+      return this.configCache.get(regionCode) || null
     }
+    const config = REGION_CONFIGS[regionCode] || null
+    if (config) this.configCache.set(regionCode, config)
+    return config
   }
 
   /**
-   * Synchronous region config lookup (from cache or disk).
+   * Synchronous region config lookup.
    * Throws if the config is not found — used by chat.service to fail fast.
    */
   getRegionConfigSync(regionCode: string): RegionConfig {
-    // Check cache first
     const cached = this.configCache.get(regionCode)
     if (cached) return cached
 
-    const configPath = path.join(this.configDir, `region_config.${regionCode}.json`)
-
-    if (!fs.existsSync(configPath)) {
+    const config = REGION_CONFIGS[regionCode]
+    if (!config) {
       throw new Error(`Region config not found for region: ${regionCode}`)
     }
-
-    const configContent = fs.readFileSync(configPath, 'utf-8')
-    const config: RegionConfig = JSON.parse(configContent)
     this.configCache.set(regionCode, config)
     return config
   }
@@ -101,7 +89,7 @@ export const regionResolver = new RegionResolver()
 
 /**
  * Named export used by chat.service.ts.
- * Synchronous — loads from disk on first call, then serves from cache.
+ * Synchronous — looks up from static config map, then caches.
  * Throws if region code is unknown.
  */
 export function getRegionConfig(regionCode: string): RegionConfig {
@@ -109,3 +97,4 @@ export function getRegionConfig(regionCode: string): RegionConfig {
 }
 
 export default regionResolver
+
