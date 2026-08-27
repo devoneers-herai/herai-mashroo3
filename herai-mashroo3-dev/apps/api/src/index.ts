@@ -31,9 +31,23 @@ async function main() {
 
  const app = express()
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+].filter(Boolean) as string[]
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl)
+      if (!origin) return callback(null, true)
+      // Allow any vercel.app subdomain (covers all preview deployments)
+      if (origin.endsWith('.vercel.app')) return callback(null, true)
+      // Allow explicitly configured origins
+      if (allowedOrigins.includes(origin)) return callback(null, true)
+      callback(new Error(`CORS: origin ${origin} not allowed`))
+    },
+    credentials: true,
   })
 )
 
