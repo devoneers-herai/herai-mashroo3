@@ -20,7 +20,7 @@ const content = {
       lastName: "Last name",
       email: "Email",
       password: "Password",
-      age: "Age",
+      birthDate: "Date of birth",
       domain: "Business domain",
       country: "Country",
       city: "City",
@@ -31,7 +31,6 @@ const content = {
       lastName: "Enter your last name",
       email: "you@example.com",
       password: "Create a password",
-      age: "Your age",
       domain: "e.g. agriculture, food, clothing",
       city: "e.g. Cairo",
       phoneNumber: "+201234567890",
@@ -61,7 +60,7 @@ const content = {
       lastName: "اسم العائلة",
       email: "البريد الإلكتروني",
       password: "كلمة المرور",
-      age: "السن",
+      birthDate: "تاريخ الميلاد",
       domain: "مجال الشغل",
       country: "الدولة",
       city: "المدينة",
@@ -72,7 +71,6 @@ const content = {
       lastName: "اكتبي اسم العائلة",
       email: "you@example.com",
       password: "اعملي كلمة مرور",
-      age: "السن",
       domain: "مثال: زراعة، أكل، ملابس",
       city: "مثال: القاهرة",
       phoneNumber: "+201234567890",
@@ -92,6 +90,19 @@ const content = {
   },
 } as const;
 
+function getAgeFromDate(dateStr: string): number | undefined {
+  if (!dateStr) return undefined;
+  const birth = new Date(dateStr);
+  if (isNaN(birth.getTime())) return undefined;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age >= 0 ? age : undefined;
+}
+
 export default function RegisterPage() {
   const [lang, setLang] = useState<Lang>("en");
 
@@ -100,7 +111,7 @@ export default function RegisterPage() {
     lastName: "",
     email: "",
     password: "",
-    age: "",
+    birthDate: "",
     domain: "",
     country: "Egypt",
     city: "",
@@ -153,6 +164,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      const calculatedAge = getAgeFromDate(form.birthDate);
       const response = await fetch(
         `${API_URL}/api/auth/register`,
         {
@@ -165,7 +177,7 @@ export default function RegisterPage() {
             password: form.password,
             firstName: form.firstName,
             lastName: form.lastName,
-            age: form.age ? Number(form.age) : undefined,
+            age: calculatedAge,
             domain: form.domain || undefined,
             country: form.country,
             city: form.city || undefined,
@@ -198,7 +210,7 @@ export default function RegisterPage() {
         lastName: "",
         email: "",
         password: "",
-        age: "",
+        birthDate: "",
         domain: "",
         country: "Egypt",
         city: "",
@@ -358,25 +370,24 @@ export default function RegisterPage() {
                 </p>
               </div>
 
-              {/* AGE + COUNTRY */}
+              {/* BIRTH DATE + COUNTRY */}
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-semibold">
-                    {t.fields.age}
+                    {t.fields.birthDate}
                   </label>
 
                   <input
-                    type="number"
-                    min="1"
-                    max="120"
-                    value={form.age}
+                    type="date"
+                    min="1920-01-01"
+                    max={new Date().toISOString().split("T")[0]}
+                    value={form.birthDate}
                     onChange={(e) =>
                       updateField(
-                        "age",
+                        "birthDate",
                         e.target.value
                       )
                     }
-                    placeholder={t.placeholders.age}
                     className="w-full rounded-2xl border border-[#1A1A1A]/15 bg-[#FBF7EC]/40 px-4 py-3 text-sm outline-none transition placeholder:text-[#1A1A1A]/30 focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/10"
                   />
                 </div>

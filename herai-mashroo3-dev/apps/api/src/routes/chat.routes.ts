@@ -6,6 +6,9 @@ type ServiceRequest = Request & {
   services?: {
     supabase?: any
     OPENAI_API_KEY?: string
+    BACKUP_AI_KEY?: string
+    GROQ_API_KEY?: string
+    GROK_API_KEY?: string
   }
   user?: any
 }
@@ -31,7 +34,8 @@ router.post(
         conversation_id,
       } = req.body
 
-      const { supabase, OPENAI_API_KEY } = req.services || {}
+      const { supabase, OPENAI_API_KEY, BACKUP_AI_KEY, GROQ_API_KEY, GROK_API_KEY } =
+        req.services || {}
       const user_id = req.user?.id
 
       if (!user_id) {
@@ -57,6 +61,7 @@ router.post(
         {
           supabase,
           openaiKey: OPENAI_API_KEY as string,
+          backupKey: (BACKUP_AI_KEY || GROQ_API_KEY || GROK_API_KEY) as string,
         }
       )
 

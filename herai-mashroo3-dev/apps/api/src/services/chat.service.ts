@@ -20,10 +20,11 @@ export async function handleChatLogic(
   input: ChatInput,
   deps: {
     supabase: any
-    openaiKey: string
+    openaiKey?: string
+    backupKey?: string
   }
 ) {
-  const { supabase, openaiKey } = deps
+  const { supabase, openaiKey, backupKey } = deps
 
   const regionCode = input.region_code || 'EG'
   const domainScope = input.domain_scope || undefined
@@ -84,7 +85,8 @@ export async function handleChatLogic(
           activeRules,
           supabase,
         },
-        openaiKey
+        openaiKey,
+        backupKey
       )
 
       // 4. Safety evaluation with real active rules
@@ -95,7 +97,8 @@ export async function handleChatLogic(
           region: regionCode,
           domain: domainScope,
         },
-        openaiKey
+        openaiKey,
+        backupKey
       )
 
       verdict.draft_response = draft
@@ -120,7 +123,8 @@ export async function handleChatLogic(
             adjustmentInstruction:
               'Ensure the response strictly adheres to safety rules and avoids any biased or prohibited language.',
           },
-          openaiKey
+          openaiKey,
+          backupKey
         )
 
         verdict = await evaluateSafety(
@@ -130,7 +134,8 @@ export async function handleChatLogic(
             region: regionCode,
             domain: domainScope,
           },
-          openaiKey
+          openaiKey,
+          backupKey
         )
 
         verdict.draft_response = draft
