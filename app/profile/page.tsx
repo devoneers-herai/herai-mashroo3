@@ -746,23 +746,6 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditing(!isEditing);
-                      setProfileSuccess("");
-                      setProfileError("");
-                    }}
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#1A1A1A]/15 bg-white px-6 text-sm font-semibold text-[#1A1A1A] shadow-sm transition hover:border-[#B8860B]/40 hover:bg-[#FBF7EC]/60"
-                  >
-                    <span>⚙️</span>
-                    <span>
-                      {isEditing
-                        ? t.viewProfile
-                        : t.editProfile}
-                    </span>
-                  </button>
-
                   <Link
                     href="/chat"
                     className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-[#B8860B] px-7 text-sm font-semibold text-white shadow-lg shadow-[#B8860B]/15 transition hover:-translate-y-0.5 hover:bg-[#96700A]"
@@ -1037,7 +1020,7 @@ export default function ProfilePage() {
             /* ACCOUNT INFORMATION VIEW */
             <section className="relative mt-6 overflow-hidden rounded-[2rem] border border-white/80 bg-white/90 p-7 shadow-[0_20px_70px_rgba(26,26,26,0.045)] backdrop-blur-xl sm:p-10">
               <div className="relative">
-                <div className="border-b border-[#1A1A1A]/8 pb-7">
+                <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#1A1A1A]/8 pb-7">
                   <div>
                     <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B8860B]">
                       {t.accountSectionLabel}
@@ -1051,6 +1034,19 @@ export default function ProfilePage() {
                       {t.accountInfoSub}
                     </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(true);
+                      setProfileSuccess("");
+                      setProfileError("");
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full border border-[#B8860B]/35 bg-[#FBF7EC]/50 px-5 py-2.5 text-xs font-semibold text-[#8C6B1C] shadow-sm transition hover:border-[#B8860B] hover:bg-white hover:shadow"
+                  >
+                    <span>✏️</span>
+                    <span>{t.editProfile}</span>
+                  </button>
                 </div>
 
                 <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
