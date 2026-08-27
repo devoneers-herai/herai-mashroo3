@@ -92,7 +92,7 @@ router.get(
       const { data, error } = await supabase
         .from('conversations')
         .select(
-          'id, scrubbed_message, created_at, verdicts(id, final_response, created_at)'
+          'id, scrubbed_message, created_at, messages(id, role, content, created_at), verdicts(id, final_response, created_at)'
         )
         .eq('user_id', user_id)
         .order('created_at', { ascending: true })
@@ -106,29 +106,41 @@ router.get(
       }[] = []
 
       data.forEach((conv: any, index: number) => {
-        const baseId =
-          new Date(conv.created_at).getTime() || index * 2
+        const sortedMessages = [...(conv.messages || [])].sort(
+          (a: any, b: any) =>
+            new Date(a.created_at).getTime() -
+            new Date(b.created_at).getTime()
+        )
 
-        if (conv.scrubbed_message) {
-          formattedMessages.push({
-            id: baseId,
-            role: 'user',
-            content: conv.scrubbed_message,
+        if (sortedMessages.length > 0) {
+          sortedMessages.forEach((m: any, mIdx: number) => {
+            formattedMessages.push({
+              id: new Date(m.created_at).getTime() || index * 100 + mIdx + 1,
+              role: m.role,
+              content: m.content,
+            })
           })
-        }
+        } else {
+          // Legacy fallback for conversations before messages table was populated
+          const baseId =
+            new Date(conv.created_at).getTime() || index * 2
 
-        if (
-          conv.verdicts &&
-          conv.verdicts.length > 0
-        ) {
-          const sortedVerdicts = [...conv.verdicts].sort(
-            (a: any, b: any) =>
-              new Date(a.created_at).getTime() -
-              new Date(b.created_at).getTime()
-          )
+          if (conv.scrubbed_message) {
+            formattedMessages.push({
+              id: baseId,
+              role: 'user',
+              content: conv.scrubbed_message,
+            })
+          }
 
-          sortedVerdicts.forEach(
-            (verdict: any, verdictIndex: number) => {
+          if (conv.verdicts && conv.verdicts.length > 0) {
+            const sortedVerdicts = [...conv.verdicts].sort(
+              (a: any, b: any) =>
+                new Date(a.created_at).getTime() -
+                new Date(b.created_at).getTime()
+            )
+
+            sortedVerdicts.forEach((verdict: any, verdictIndex: number) => {
               if (verdict.final_response) {
                 formattedMessages.push({
                   id: baseId + verdictIndex + 1,
@@ -136,8 +148,8 @@ router.get(
                   content: verdict.final_response,
                 })
               }
-            }
-          )
+            })
+          }
         }
       })
 
@@ -170,7 +182,7 @@ router.get(
       const { data, error } = await supabase
         .from('conversations')
         .select(
-          'id, scrubbed_message, created_at, verdicts(id, final_response, created_at)'
+          'id, scrubbed_message, created_at, messages(id, role, content, created_at), verdicts(id, final_response, created_at)'
         )
         .eq('user_id', user_id)
         .order('created_at', { ascending: false })
@@ -178,31 +190,36 @@ router.get(
       if (error) throw error
 
       const conversations = data.map((conv: any) => {
-        const sortedVerdicts = [...(conv.verdicts || [])].sort(
+        const sortedMessages = [...(conv.messages || [])].sort(
           (a: any, b: any) =>
             new Date(a.created_at).getTime() -
             new Date(b.created_at).getTime()
         )
 
-        const latestVerdict =
-          sortedVerdicts[sortedVerdicts.length - 1]
+        const firstUserMessage =
+          sortedMessages.find((m: any) => m.role === 'user')?.content ||
+          conv.scrubbed_message ||
+          ''
+
+        const lastAssistantMessage =
+          [...sortedMessages].reverse().find((m: any) => m.role === 'assistant')
+            ?.content ||
+          [...(conv.verdicts || [])]
+            .sort(
+              (a: any, b: any) =>
+                new Date(a.created_at).getTime() -
+                new Date(b.created_at).getTime()
+            )
+            .pop()?.final_response ||
+          ''
 
         return {
           id: conv.id,
-
-          // The first message remains the title.
-          title:
-            conv.scrubbed_message || 'New Chat',
-
+          // The first user message remains the title.
+          title: firstUserMessage || 'New Chat',
           created_at: conv.created_at,
-
-          // First user message
-          user_message:
-            conv.scrubbed_message || '',
-
-          // Latest assistant response
-          assistant_message:
-            latestVerdict?.final_response || '',
+          user_message: firstUserMessage,
+          assistant_message: lastAssistantMessage,
         }
       })
 
@@ -250,6 +267,27 @@ router.get(
         return
       }
 
+      // Fetch messages from messages table
+      const { data: dbMessages, error: messagesError } = await supabase
+        .from('messages')
+        .select('id, role, content, created_at')
+        .eq('conversation_id', id)
+        .order('created_at', { ascending: true })
+
+      if (!messagesError && dbMessages && dbMessages.length > 0) {
+        const messages = dbMessages.map((m: any, index: number) => ({
+          id: new Date(m.created_at).getTime() || index + 1,
+          role: m.role,
+          content: m.content,
+        }))
+
+        res.json({
+          messages,
+        })
+        return
+      }
+
+      // Fallback for legacy conversations where messages table is empty
       const { data, error } = await supabase
         .from('conversations')
         .select(
@@ -347,7 +385,13 @@ router.delete(
         return
       }
 
-      // Delete verdicts first because of FK constraint.
+      // Delete messages first
+      await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', id)
+
+      // Delete verdicts because of FK constraint.
       const { error: verdictError } = await supabase
         .from('verdicts')
         .delete()

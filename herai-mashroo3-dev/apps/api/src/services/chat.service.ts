@@ -262,6 +262,33 @@ export async function handleChatLogic(
     }
 
     /*
+     * 7.5 PERSIST USER & ASSISTANT MESSAGES
+     *
+     * Save both the user question and the assistant response
+     * into the messages table so all conversation turns are preserved.
+     */
+    const messagesToInsert = [
+      {
+        conversation_id: conversationId,
+        role: 'user',
+        content: scrubbed,
+      },
+      {
+        conversation_id: conversationId,
+        role: 'assistant',
+        content: finalResponse,
+      },
+    ]
+
+    const { error: messagesError } = await supabase
+      .from('messages')
+      .insert(messagesToInsert)
+
+    if (messagesError) {
+      console.error('Failed to insert chat messages:', messagesError)
+    }
+
+    /*
      * 8. SAVE VERDICT AUDIT RECORDS
      *
      * Intermediate records maintain their pre-adjustment state (final_response = null)
